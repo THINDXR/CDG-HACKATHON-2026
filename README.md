@@ -23,6 +23,20 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 Geolocation บนโปรโตคอลที่ไม่ปลอดภัย — บนเครื่องตัวเอง `localhost` ถือว่าปลอดภัยแล้ว
 ถ้าจะขึ้น production ต้องใช้ HTTPS
 
+## เปิดดูบนมือถือผ่าน GitHub Pages
+
+โปรเจกต์นี้เป็นเว็บสแตติกล้วน จึงวางบน GitHub Pages ได้เลยโดยไม่ต้อง build
+
+1. ไปที่ **Settings → Pages** ของ repo
+2. ที่ **Source** เลือก **Deploy from a branch**
+3. เลือก branch `main` โฟลเดอร์ `/ (root)` แล้วกด **Save**
+
+รอราว 1-2 นาที เว็บจะขึ้นที่ `https://<ชื่อบัญชี>.github.io/<ชื่อ repo>/`
+หลังจากนั้นทุกครั้งที่ push ขึ้น `main` Pages จะอัปเดตให้เองอัตโนมัติ
+
+Pages ให้ HTTPS มาด้วย ระบบติดตามตำแหน่ง (Geolocation) จึงใช้งานได้บนมือถือจริง
+บน iPhone กด **แชร์ → เพิ่มไปยังหน้าจอโฮม** จะเปิดแบบเต็มจอเหมือนแอปได้
+
 ## โครงสร้างไฟล์
 
 ```
