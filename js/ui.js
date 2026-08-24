@@ -12,24 +12,61 @@ window.UI = (function () {
 
   /* ---------- ตัวกรองประเภท ---------- */
 
+  const typeCount = Object.keys(CFG.HAZARD_TYPES).length;
+
+  /** ชิปกรองด่วนเหนือแผนที่ — มี "ทั้งหมด" นำหน้า แล้วตามด้วยแต่ละประเภท */
   function renderFilters() {
-    const box = $('#filters');
+    const box = $('#quickFilters');
     box.innerHTML = '';
+
+    const all = el('button', 'chip chip--all');
+    all.type = 'button';
+    all.dataset.type = '*';
+    all.textContent = 'ทั้งหมด';
+    all.addEventListener('click', () => window.Store.setAllTypes(true));
+    box.appendChild(all);
+
     for (const [key, def] of Object.entries(CFG.HAZARD_TYPES)) {
       const btn = el('button', 'chip');
       btn.type = 'button';
       btn.dataset.type = key;
       btn.style.setProperty('--chip-color', def.color);
       btn.innerHTML = `<span>${def.icon}</span>${escapeHtml(def.label)}`;
-      btn.classList.toggle('is-on', window.Store.state.activeTypes.has(key));
       btn.addEventListener('click', () => window.Store.toggleType(key));
       box.appendChild(btn);
     }
+    syncFilters();
+  }
+
+  /** รายการกรองแบบเต็มในแผ่นซ้อน */
+  function renderFilterSheet() {
+    const box = $('#filterList');
+    box.innerHTML = '';
+    for (const [key, def] of Object.entries(CFG.HAZARD_TYPES)) {
+      const row = el('button', 'filter-row');
+      row.type = 'button';
+      row.dataset.type = key;
+      row.style.setProperty('--row-color', def.color);
+      row.innerHTML = `
+        <span class="filter-row__icon">${def.icon}</span>
+        <span class="filter-row__label">${escapeHtml(def.label)}</span>
+        <span class="filter-row__check">✓</span>`;
+      row.addEventListener('click', () => window.Store.toggleType(key));
+      box.appendChild(row);
+    }
+    syncFilters();
   }
 
   function syncFilters() {
-    $$('#filters .chip').forEach((btn) => {
-      btn.classList.toggle('is-on', window.Store.state.activeTypes.has(btn.dataset.type));
+    const active = window.Store.state.activeTypes;
+    const showingAll = active.size === typeCount;
+    $$('#quickFilters .chip').forEach((btn) => {
+      // เมื่อเลือก "ทั้งหมด" ชิปรายประเภทจะเป็นสีกลาง ไม่ให้แถบดูรกไปหมด
+      const on = btn.dataset.type === '*' ? showingAll : !showingAll && active.has(btn.dataset.type);
+      btn.classList.toggle('is-on', on);
+    });
+    $$('#filterList .filter-row').forEach((row) => {
+      row.classList.toggle('is-on', active.has(row.dataset.type));
     });
   }
 
@@ -56,7 +93,10 @@ window.UI = (function () {
 
     if (!items.length) {
       const empty = el('li', 'empty-state');
-      empty.innerHTML = `<div>🛣️</div><p>ยังไม่มีรายงานที่ตรงกับตัวกรอง<br />ลองเปิดตัวกรองเพิ่ม หรือกด “แจ้งเหตุ”</p>`;
+      const searching = window.Store.state.search.trim();
+      empty.innerHTML = searching
+        ? `<div>🔍</div><p>ไม่พบรายงานที่ตรงกับ “${escapeHtml(searching)}”<br />ลองคำอื่น หรือล้างช่องค้นหา</p>`
+        : `<div>🛣️</div><p>ยังไม่มีรายงานที่ตรงกับตัวกรอง<br />ลองเปิดตัวกรองเพิ่ม หรือกด “แจ้งเหตุ”</p>`;
       list.appendChild(empty);
     }
 
@@ -76,18 +116,18 @@ window.UI = (function () {
             <span class="sev sev--${item.severity}">${escapeHtml(sev.label)}</span>
           </div>
           <div class="hazard-item__road">${escapeHtml(item.road)}</div>
-          ${item.note ? `<div class="hazard-item__note">${escapeHtml(item.note)}</div>` : ''}
           <div class="hazard-item__meta">
-            ${item.distance != null ? `<span>📍 ${U.formatDistance(item.distance)}</span>` : ''}
-            <span>🕒 ${U.formatAgo(item.createdAt)}</span>
-            <span>👍 ${item.confirms}</span>
+            ${item.distance != null ? `<span>${U.formatDistance(item.distance)}</span>` : ''}
+            <span>${U.formatAgo(item.createdAt)}</span>
+            <span>${item.confirms} รายงาน</span>
           </div>
-        </div>`;
+        </div>
+        <span class="hazard-item__go" aria-hidden="true">›</span>`;
 
       li.addEventListener('click', () => {
         window.Store.select(item.id);
         window.MapView.flyToReport(item);
-        closeMobilePanel();
+        collapseToMap();
       });
       list.appendChild(li);
     }
@@ -95,17 +135,64 @@ window.UI = (function () {
     const total = window.Store.state.reports.length;
     const high = window.Store.state.reports.filter((r) => r.severity === 'high').length;
     $('#statsLine').textContent = `ทั้งหมด ${total} รายงาน · อันตราย ${high} จุด`;
+
+    // สรุปความเสี่ยงใช้ข้อมูลชุดเดียวกัน จึงวาดใหม่พร้อมกันเสมอ
+    renderRisk();
+  }
+
+  /* ---------- สรุปความเสี่ยง ---------- */
+
+  function renderRisk() {
+    const box = $('#riskPanel');
+    const risk = window.Store.riskAssessment(origin());
+    const known = window.Store.state.userPosition != null;
+
+    box.style.setProperty('--risk-color', risk.level.color);
+    box.dataset.level = risk.level.key;
+
+    // ป้ายย่อบนแผนที่ ใช้ข้อมูลชุดเดียวกัน
+    const chip = $('#riskChip');
+    chip.style.setProperty('--risk-color', risk.level.color);
+    chip.dataset.level = risk.level.key;
+    chip.querySelector('.risk-chip__label').textContent = risk.level.label;
+    chip.querySelector('.risk-chip__score').textContent = risk.score;
+
+    const dominant = risk.dominantType ? CFG.HAZARD_TYPES[risk.dominantType] : null;
+    const nearestText = risk.nearest && risk.nearest.distance != null
+      ? U.formatDistance(risk.nearest.distance)
+      : '—';
+
+    box.innerHTML = `
+      <div class="risk__head">
+        <span class="risk__title">ความเสี่ยงรอบตัว</span>
+        <span class="risk__level">${escapeHtml(risk.level.label)} · ${risk.score}</span>
+      </div>
+      <div class="risk__meter" role="meter" aria-valuenow="${risk.score}"
+           aria-valuemin="0" aria-valuemax="100"
+           aria-label="คะแนนความเสี่ยง ${risk.score} จาก 100">
+        <div class="risk__bar" style="width:${Math.max(risk.score, 2)}%"></div>
+      </div>
+      <div class="risk__stats">
+        <div><strong>${risk.count}</strong><span>จุดใกล้เคียง</span></div>
+        <div><strong>${risk.high}</strong><span>อันตราย</span></div>
+        <div><strong>${escapeHtml(nearestText)}</strong><span>ใกล้ที่สุด</span></div>
+      </div>
+      <p class="risk__advice">
+        ${dominant ? `${dominant.icon} ส่วนใหญ่เป็น${escapeHtml(dominant.label)} — ` : ''}${escapeHtml(risk.level.advice)}${known ? '' : ' (คิดจากกลางจอแผนที่)'}
+      </p>`;
   }
 
   /* ---------- การ์ดรายละเอียด ---------- */
 
   function renderDetail() {
-    const card = $('#detailCard');
+    const card = $('#sheetDetail');
+    const sheet = $('#sidebar');
     const id = window.Store.state.selectedId;
     const report = window.Store.state.reports.find((r) => r.id === id);
 
+    // ไม่มีอะไรถูกเลือก = กลับไปโหมดรายการตามปกติ
     if (!report) {
-      card.hidden = true;
+      sheet.classList.remove('is-detail');
       card.innerHTML = '';
       return;
     }
@@ -114,20 +201,19 @@ window.UI = (function () {
     const sev = CFG.SEVERITY[report.severity];
     const dist = U.distance(origin(), [report.lng, report.lat]);
 
-    card.hidden = false;
+    sheet.classList.add('is-detail');
     card.style.setProperty('--card-color', def.color);
     card.innerHTML = `
-      <button class="detail-card__close" type="button" aria-label="ปิด">✕</button>
       <div class="detail-card__head">
         <div class="detail-card__icon">${def.icon}</div>
         <div>
           <strong>${escapeHtml(def.label)}</strong>
           <div class="detail-card__sub">
             <span class="sev sev--${report.severity}">${escapeHtml(sev.label)}</span>
-            <span>${escapeHtml(report.road)}</span>
           </div>
         </div>
       </div>
+      <h3 class="detail-card__road">${escapeHtml(report.road)}</h3>
       ${report.note ? `<p class="detail-card__note">${escapeHtml(report.note)}</p>` : ''}
       <div class="detail-card__stats">
         <div><span>ระยะห่าง</span><strong>${U.formatDistance(dist)}</strong></div>
@@ -140,7 +226,6 @@ window.UI = (function () {
         ${report.mine ? '<button class="ghost-btn danger" data-act="delete">ลบ</button>' : ''}
       </div>`;
 
-    card.querySelector('.detail-card__close').addEventListener('click', () => window.Store.select(null));
     card.querySelectorAll('[data-act]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const act = btn.dataset.act;
@@ -224,6 +309,27 @@ window.UI = (function () {
     syncSeverity();
     $('#reportSheet').hidden = false;
     requestAnimationFrame(() => $('#reportSheet').classList.add('is-open'));
+    fillRoadFromLocation();
+  }
+
+  /** เติมชื่อถนนให้อัตโนมัติ คนที่กำลังขับจะได้ไม่ต้องพิมพ์เอง */
+  let roadLookupId = 0;
+  async function fillRoadFromLocation() {
+    const input = $('#roadInput');
+    if (input.value.trim()) return; // ผู้ใช้พิมพ์เองแล้ว อย่าไปทับ
+
+    const id = ++roadLookupId;
+    const [lng, lat] = resolveLocation();
+    input.placeholder = 'กำลังหาชื่อถนน…';
+    try {
+      const road = await window.Geocode.reverse(lng, lat);
+      if (id !== roadLookupId) return;
+      if (road && !input.value.trim()) input.value = road;
+    } catch (_) {
+      /* หาไม่เจอก็ปล่อยให้พิมพ์เอง */
+    } finally {
+      if (id === roadLookupId) input.placeholder = 'เช่น ถนนพระราม 4 ใกล้แยกคลองเตย';
+    }
   }
 
   function closeReportSheet() {
@@ -276,39 +382,223 @@ window.UI = (function () {
     $('#setSound').checked = window.Alerts.settings.sound;
     $('#setVoice').checked = window.Alerts.settings.voice;
     $('#setVibrate').checked = window.Alerts.settings.vibrate;
-    $('#settingsSheet').hidden = false;
-    requestAnimationFrame(() => $('#settingsSheet').classList.add('is-open'));
+    $('#setSim').checked = window.Store.state.simulating;
+    openOverlay('#settingsSheet');
   }
 
-  function closeSettings() {
-    const sheet = $('#settingsSheet');
+  /* ---------- แผ่นซ้อนทั่วไป ---------- */
+
+  function openOverlay(sel) {
+    $(sel).hidden = false;
+    requestAnimationFrame(() => $(sel).classList.add('is-open'));
+  }
+
+  function closeOverlay(sel) {
+    const sheet = $(sel);
     sheet.classList.remove('is-open');
     setTimeout(() => { sheet.hidden = true; }, 200);
   }
 
-  /* ---------- แผงบนมือถือ ---------- */
+  /* ---------- ค้นหา ---------- */
 
-  function toggleMobilePanel() {
-    $('#sidebar').classList.toggle('is-open');
+  function hideSearchResults() {
+    const box = $('#searchResults');
+    box.hidden = true;
+    box.innerHTML = '';
+  }
+
+  function renderSearchResults(places) {
+    const box = $('#searchResults');
+    box.innerHTML = '';
+
+    if (!places.length) {
+      box.innerHTML = '<div class="search-note">ไม่พบสถานที่ที่ตรงกับคำค้น</div>';
+      box.hidden = false;
+      return;
+    }
+
+    for (const place of places) {
+      const btn = el('button', 'search-result');
+      btn.type = 'button';
+      btn.setAttribute('role', 'option');
+      btn.innerHTML = `
+        <span class="search-result__pin" aria-hidden="true">📍</span>
+        <span class="search-result__text">
+          <span class="search-result__name">${escapeHtml(place.name)}</span>
+          ${place.detail ? `<span class="search-result__detail">${escapeHtml(place.detail)}</span>` : ''}
+        </span>`;
+      btn.addEventListener('click', () => goToPlace(place));
+      box.appendChild(btn);
+    }
+    box.hidden = false;
+  }
+
+  function goToPlace(place) {
+    $('#searchInput').value = '';
+    window.Store.setSearch('');
+    hideSearchResults();
+    $('#searchInput').blur();
+
+    window.MapView.instance.flyTo({
+      center: [place.lng, place.lat],
+      zoom: 15.5,
+      pitch: 55,
+      duration: 1200,
+    });
+    setDetent('peek');
+    toast(`ไปที่ ${place.name}`);
+  }
+
+  function bindSearch() {
+    const input = $('#searchInput');
+    let filterTimer = null;
+    let placeTimer = null;
+    let requestId = 0;
+
+    input.addEventListener('input', () => {
+      const value = input.value;
+
+      // กรองรายงานทันที (ทำในเครื่อง เร็ว)
+      clearTimeout(filterTimer);
+      filterTimer = setTimeout(() => window.Store.setSearch(value), 180);
+
+      // ค้นสถานที่จริงต้องยิงเน็ต จึงหน่วงนานกว่าและเลิกถ้าคำสั้นเกินไป
+      clearTimeout(placeTimer);
+      if (value.trim().length < 2) {
+        hideSearchResults();
+        return;
+      }
+      placeTimer = setTimeout(() => lookupPlaces(value), 650);
+    });
+
+    async function lookupPlaces(value) {
+      const id = ++requestId;
+      try {
+        const places = await window.Geocode.search(value, origin());
+        if (id !== requestId || input.value.trim() !== value.trim()) return;
+        renderSearchResults(places);
+      } catch (_) {
+        if (id !== requestId) return;
+        // ออฟไลน์หรือ Nominatim ล่ม — ยังกรองรายงานในเครื่องได้ตามปกติ
+        const box = $('#searchResults');
+        box.innerHTML = '<div class="search-note">ค้นหาสถานที่ไม่สำเร็จ — ยังกรองรายงานในรายการได้</div>';
+        box.hidden = false;
+      }
+    }
+
+    // แตะช่องค้นหา = กางรายการเต็มจอให้เลือกได้สะดวก
+    input.addEventListener('focus', () => setDetent('full'));
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        input.value = '';
+        window.Store.setSearch('');
+        hideSearchResults();
+        input.blur();
+        setDetent('peek');
+      }
+    });
+
+    // แตะที่อื่นแล้วปิดรายการผลลัพธ์
+    document.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('#searchResults') || e.target.closest('.searchbar')) return;
+      hideSearchResults();
+    });
+  }
+
+  /* ---------- แผ่นรายการแบบลากได้ ---------- */
+
+  // ระยะที่เลื่อนแผ่นลง คิดเป็น % ของความสูงแผ่น (0 = เปิดเต็ม)
+  const DETENTS = { full: 0, half: 42, peek: 56, closed: 100 };
+  let detent = 'peek';
+
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+  function setDetent(name) {
+    const sheet = $('#sidebar');
+    detent = name;
+    sheet.dataset.detent = name;
+    sheet.classList.toggle('is-open', name !== 'closed');
+    // เผื่อระยะขอบล่างตอนปิด เพื่อให้ซ่อนมิด
+    sheet.style.setProperty(
+      '--sheet-shift',
+      name === 'closed' ? 'calc(100% + 16px)' : `${DETENTS[name]}%`
+    );
+  }
+
+  function nearestDetent(pct) {
+    return Object.keys(DETENTS).reduce((best, key) =>
+      Math.abs(DETENTS[key] - pct) < Math.abs(DETENTS[best] - pct) ? key : best
+    );
+  }
+
+  function bindSheetDrag() {
+    const sheet = $('#sidebar');
+    const grip = sheet.querySelector('.sidebar__head');
+    let startY = 0;
+    let startPx = 0;
+    let height = 0;
+    let dragging = false;
+
+    grip.addEventListener('pointerdown', (e) => {
+      // ปุ่มในหัวแผ่น (กรองข้อมูล / ย้อนกลับ) ต้องกดได้ ไม่ใช่ไปลากแผ่น
+      if (e.target.closest('button')) return;
+      dragging = true;
+      startY = e.clientY;
+      height = sheet.offsetHeight;
+      startPx = (DETENTS[detent] / 100) * height;
+      sheet.classList.add('is-dragging');
+      grip.setPointerCapture(e.pointerId);
+    });
+
+    grip.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const px = clamp(startPx + (e.clientY - startY), 0, height);
+      sheet.style.setProperty('--sheet-shift', `${px}px`);
+    });
+
+    const finish = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      sheet.classList.remove('is-dragging');
+      const moved = Math.abs(e.clientY - startY);
+
+      // ขยับน้อยกว่า 6px ถือว่าเป็นการ "แตะ" ไม่ใช่ลาก — สลับแง้ม/ครึ่งจอ
+      if (moved < 6) {
+        setDetent(detent === 'peek' ? 'half' : 'peek');
+        return;
+      }
+      const px = clamp(startPx + (e.clientY - startY), 0, height);
+      setDetent(nearestDetent((px / height) * 100));
+    };
+
+    grip.addEventListener('pointerup', finish);
+    grip.addEventListener('pointercancel', finish);
   }
 
   function closeMobilePanel() {
-    if (window.matchMedia('(max-width: 860px)').matches) {
-      $('#sidebar').classList.remove('is-open');
-    }
+    setDetent('closed');
   }
 
-  /* ---------- สถานะปุ่มติดตาม ---------- */
+  /** เลือกรายการแล้ว — แผ่นสลับเป็นหน้ารายละเอียด เปิดครึ่งจอให้เห็นแผนที่ด้วย */
+  function collapseToMap() {
+    const input = $('#searchInput');
+    if (document.activeElement === input) input.blur();
+    hideSearchResults();
+    setDetent('half');
+  }
+
+  /* ---------- สถานะปุ่มติดตาม / เสียง ---------- */
 
   function syncStatusButtons() {
     const s = window.Store.state;
-    const trackBtn = $('#btnTrack');
     const tracking = window.Alerts.isTracking || s.simulating;
-    trackBtn.classList.toggle('is-live', tracking);
-    $('#trackLabel').textContent = tracking
-      ? s.simulating ? 'กำลังจำลองการขับ' : 'กำลังติดตามตำแหน่ง'
-      : 'เริ่มติดตามตำแหน่ง';
-    $('#btnSim').classList.toggle('is-active', s.simulating);
+    $('#btnTrack').classList.toggle('is-live', tracking);
+    $('#btnTrack').title = tracking ? 'กำลังติดตามตำแหน่ง' : 'ติดตามตำแหน่งของฉัน';
+
+    const muted = !window.Alerts.settings.sound;
+    $('#btnMute').textContent = muted ? '🔕' : '🔔';
+    $('#btnMute').title = muted ? 'เปิดเสียงเตือน' : 'ปิดเสียงเตือน';
   }
 
   function setNearby(list) {
@@ -319,10 +609,21 @@ window.UI = (function () {
 
   function bind() {
     renderFilters();
+    renderFilterSheet();
     renderTypeGrid();
 
+    $('#btnFilter').addEventListener('click', () => openOverlay('#filterSheet'));
+    // ปุ่มย้อนกลับในหน้ารายละเอียด — เลิกเลือกแล้วแผ่นจะกลับเป็นรายการเอง
+    $('#btnBack').addEventListener('click', () => window.Store.select(null));
+    $('#filterClose').addEventListener('click', () => closeOverlay('#filterSheet'));
+    $('#filterSheet').addEventListener('click', (e) => {
+      if (e.target.id === 'filterSheet') closeOverlay('#filterSheet');
+    });
     $('#filterAll').addEventListener('click', () => window.Store.setAllTypes(true));
     $('#filterNone').addEventListener('click', () => window.Store.setAllTypes(false));
+
+    bindSearch();
+
     $('#btnReset').addEventListener('click', () => {
       window.Store.resetToSeed();
       toast('รีเซ็ตข้อมูลตัวอย่างแล้ว');
@@ -347,6 +648,9 @@ window.UI = (function () {
       window.MapView.setPickMode(false);
       $('#reportSheet').classList.remove('is-picking');
       updateLocationText();
+      // ย้ายจุดแล้วชื่อถนนเดิมอาจไม่ตรง จึงหาใหม่ให้
+      $('#roadInput').value = '';
+      fillRoadFromLocation();
       toast('บันทึกตำแหน่งแล้ว');
     };
 
@@ -358,24 +662,37 @@ window.UI = (function () {
     });
 
     $('#btnSettings').addEventListener('click', openSettings);
-    $('#settingsClose').addEventListener('click', closeSettings);
+    $('#settingsClose').addEventListener('click', () => closeOverlay('#settingsSheet'));
     $('#settingsSheet').addEventListener('click', (e) => {
-      if (e.target.id === 'settingsSheet') closeSettings();
+      if (e.target.id === 'settingsSheet') closeOverlay('#settingsSheet');
     });
     $('#setSound').addEventListener('change', (e) => {
       window.Alerts.setSetting('sound', e.target.checked);
       if (e.target.checked) window.Alerts.ensureAudio();
+      syncStatusButtons();
     });
     $('#setVoice').addEventListener('change', (e) => window.Alerts.setSetting('voice', e.target.checked));
     $('#setVibrate').addEventListener('change', (e) => window.Alerts.setSetting('vibrate', e.target.checked));
 
+    // กระดิ่งบนแถบบน = ปิด/เปิดเสียงเตือนอย่างเร็ว
+    $('#btnMute').addEventListener('click', () => {
+      const next = !window.Alerts.settings.sound;
+      window.Alerts.setSetting('sound', next);
+      if (next) window.Alerts.ensureAudio();
+      syncStatusButtons();
+      toast(next ? 'เปิดเสียงเตือนแล้ว' : 'ปิดเสียงเตือนแล้ว');
+    });
+
     $('#alertClose').addEventListener('click', hideAlert);
-    $('#btnPanel').addEventListener('click', toggleMobilePanel);
+    $('#riskChip').addEventListener('click', () => setDetent('half'));
+    bindSheetDrag();
+    setDetent('peek');
 
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
       if (!$('#reportSheet').hidden) closeReportSheet();
-      else if (!$('#settingsSheet').hidden) closeSettings();
+      else if (!$('#filterSheet').hidden) closeOverlay('#filterSheet');
+      else if (!$('#settingsSheet').hidden) closeOverlay('#settingsSheet');
       else if (window.Store.state.selectedId) window.Store.select(null);
     });
   }
@@ -383,8 +700,11 @@ window.UI = (function () {
   return {
     bind,
     renderList,
+    renderRisk,
     renderDetail,
+    showDetailSheet: collapseToMap,
     renderFilters,
+    renderFilterSheet,
     syncFilters,
     syncStatusButtons,
     showAlert,

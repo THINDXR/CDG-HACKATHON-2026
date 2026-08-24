@@ -1,50 +1,152 @@
 /* RoadWarn — สไตล์หลัก (โทนกระจกฝ้าแบบแผนที่บน iOS) */
 
 :root {
-  --bg: #f2f2f7;
-  --surface: rgba(255, 255, 255, 0.72);
-  --surface-solid: #ffffff;
-  --border: rgba(0, 0, 0, 0.08);
-  --text: #1c1c1e;
-  --text-dim: #6b6b70;
-  --accent: #0a84ff;
-  --danger: #ff3b30;
+  color-scheme: dark;
+
+  --bg: #0b0f18;
+  --surface: rgba(24, 29, 41, 0.78);
+  --surface-solid: #151a26;
+  --surface-raised: #1c2231;
+  --border: rgba(255, 255, 255, 0.09);
+  --text: #f3f5f9;
+  --text-dim: #8b93a7;
+  --accent: #ff7a1a;
+  --accent-soft: rgba(255, 122, 26, 0.16);
+  --danger: #ff453a;
   --warn: #ff9f0a;
   --ok: #30d158;
-  --shadow: 0 8px 30px rgba(0, 0, 0, 0.14);
-  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.1);
+  --shadow: 0 12px 38px rgba(0, 0, 0, 0.62);
+  --shadow-sm: 0 3px 14px rgba(0, 0, 0, 0.5);
   --radius: 18px;
-  --radius-sm: 12px;
-  --topbar-h: 62px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #000000;
-    --surface: rgba(28, 28, 30, 0.74);
-    --surface-solid: #1c1c1e;
-    --border: rgba(255, 255, 255, 0.12);
-    --text: #f5f5f7;
-    --text-dim: #9a9aa0;
-    --shadow: 0 8px 34px rgba(0, 0, 0, 0.6);
-    --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.5);
-  }
+  --radius-sm: 14px;
+  --topbar-h: 56px;
+  --search-h: 44px;
+  --chips-h: 34px;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
 }
 
 * { box-sizing: border-box; }
+
+/*
+ * ต้องมาก่อนทุกกฎที่ตั้ง display เอง
+ * `hidden` เป็นกฎจาก UA stylesheet (display:none) ซึ่งแพ้กฎของเราอย่าง
+ * `.sheet-backdrop { display: grid }` ทำให้แผ่นซ้อนที่ควรถูกซ่อน
+ * ยังคลุมทั้งจอและกินอีเวนต์เมาส์/นิ้วจนแผนที่ลากไม่ได้
+ */
+[hidden] { display: none !important; }
 
 html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Noto Sans Thai',
     'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
-button { font: inherit; color: inherit; cursor: pointer; }
+/* กันแถบ URL ของ Safari บน iOS ทำให้ความสูงเพี้ยน */
+@supports (height: 100dvh) {
+  html, body { height: 100dvh; }
+}
+
+/* สกรอลบาร์ให้เข้ากับธีมมืด ไม่ให้เป็นแถบสีอ่อนตัดกับพื้นหลัง */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+button:active { transform: scale(0.96); }
+
+/* ---------------- กรอบเครื่อง (สัดส่วน iPhone) ---------------- */
+
+.phone {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  container: phone / size;
+  /* ระยะจากขอบบน ใช้วางแถบต่าง ๆ ที่ซ้อนกันลงมา */
+  --below-topbar: calc(max(12px, calc(var(--safe-t) + 8px)) + var(--topbar-h) + 8px);
+  --below-search: calc(var(--below-topbar) + var(--search-h) + 8px);
+  /* แถบชิปสูงกว่าตัวชิป 14px เพราะมี padding เผื่อเงาไว้บน-ล่าง */
+  --below-filters: calc(var(--below-search) + var(--chips-h) + 14px + 8px);
+}
+
+/* บนจอกว้าง แสดงเป็นเครื่อง iPhone กลางจอ */
+@media (min-width: 861px) {
+  body {
+    display: grid;
+    place-items: center;
+    background-image: radial-gradient(circle at 50% 0%, #232a3a, #0a0d14 70%);
+    padding: 20px;
+  }
+
+  .phone {
+    width: min(390px, calc((100vh - 40px) * 390 / 844));
+    height: min(844px, calc(100vh - 40px));
+    border-radius: 44px;
+    box-shadow:
+      0 0 0 12px #1c1c1e,
+      0 0 0 13px #3a3a3c,
+      0 30px 70px rgba(0, 0, 0, 0.45);
+  }
+
+  /* รอยบากและแถบโฮม */
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 112px;
+    height: 30px;
+    border-radius: 16px;
+    background: #0a0a0c;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .phone::after {
+    content: '';
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 130px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.45);
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  /* จำลอง safe area ของ iPhone ให้ UI หลบรอยบาก/แถบโฮม */
+  .phone {
+    --safe-t: 44px;
+    --safe-b: 26px;
+  }
+}
 
 #map {
   position: absolute;
@@ -63,9 +165,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .topbar {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  right: 12px;
+  top: max(12px, calc(var(--safe-t) + 8px));
+  left: max(12px, var(--safe-l));
+  right: max(12px, var(--safe-r));
   height: var(--topbar-h);
   z-index: 20;
   border-radius: var(--radius);
@@ -76,11 +178,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding: 0 14px;
 }
 
-.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; overflow: hidden; }
 
 .brand__mark {
   width: 38px;
   height: 38px;
+  flex: none;
   display: grid;
   place-items: center;
   font-size: 20px;
@@ -90,74 +193,192 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 .brand__text { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
-.brand__text strong { font-size: 16px; letter-spacing: -0.2px; }
+.brand__text strong {
+  font-size: 16px;
+  letter-spacing: -0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .brand__text span { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
 
-.topbar__status { display: flex; align-items: center; gap: 8px; }
+.topbar__status { display: flex; align-items: center; gap: 8px; flex: none; }
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 36px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface-solid);
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.pill:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
-
-.pill__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-dim);
-}
-.pill.is-live { border-color: rgba(48, 209, 88, 0.5); }
-.pill.is-live .pill__dot {
-  background: var(--ok);
-  box-shadow: 0 0 0 0 rgba(48, 209, 88, 0.6);
-  animation: livePulse 1.8s infinite;
-}
 @keyframes livePulse {
-  70% { box-shadow: 0 0 0 8px rgba(48, 209, 88, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(48, 209, 88, 0); }
-}
-
-.pill--ghost { background: transparent; }
-.pill--ghost.is-active {
-  background: var(--accent);
-  color: #fff;
-  border-color: transparent;
+  70% { box-shadow: 0 0 0 9px rgba(255, 122, 26, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 122, 26, 0); }
 }
 
 .icon-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
   border: 1px solid var(--border);
-  background: var(--surface-solid);
+  background: var(--surface-raised);
   display: grid;
   place-items: center;
   font-size: 15px;
 }
-.icon-btn:hover { box-shadow: var(--shadow-sm); }
+.icon-btn:hover { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 
-.only-mobile { display: none; }
+/* ---------------- แถบค้นหา ---------------- */
+
+.searchbar {
+  position: absolute;
+  top: var(--below-topbar);
+  left: max(12px, var(--safe-l));
+  right: max(12px, var(--safe-r));
+  height: var(--search-h);
+  z-index: 19;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 6px 0 13px;
+  border-radius: var(--radius);
+}
+
+.searchbar__icon { font-size: 14px; opacity: 0.75; flex: none; }
+
+.searchbar__input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+.searchbar__input::placeholder { color: var(--text-dim); }
+/* ปุ่มล้างของ type=search บน WebKit ไม่เข้ากับธีมมืด */
+.searchbar__input::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+.searchbar__locate {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--accent-soft);
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  transition: background 0.18s ease;
+}
+.searchbar__locate.is-live {
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(255, 122, 26, 0.6);
+  animation: livePulse 1.8s infinite;
+}
+
+.search-results {
+  position: absolute;
+  top: var(--below-search);
+  left: max(12px, var(--safe-l));
+  right: max(12px, var(--safe-r));
+  z-index: 30;
+  max-height: 46cqh;
+  overflow-y: auto;
+  border-radius: var(--radius);
+  padding: 5px;
+}
+
+.search-result {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  text-align: left;
+}
+.search-result:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
+.search-result__pin { font-size: 16px; flex: none; }
+.search-result__text { min-width: 0; flex: 1; }
+.search-result__name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-result__detail {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-note {
+  padding: 12px 12px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* ---------------- ชิปกรองด่วน ---------------- */
+
+.quickfilters {
+  position: absolute;
+  top: var(--below-search);
+  left: 0;
+  right: 0;
+  z-index: 18;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  /* เผื่อระยะบน-ล่างให้เงาของชิป ไม่งั้น overflow จะตัดเงาจนชิปดูสูงไม่เท่ากัน */
+  padding: 7px max(12px, var(--safe-l));
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.quickfilters::-webkit-scrollbar { display: none; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: var(--chips-h);
+  padding: 0 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  /* พื้นทึบ ไม่ให้แผนที่ข้างหลังทะลุมาไม่เท่ากันในแต่ละชิป */
+  background: var(--surface-solid);
+  color: var(--text-dim);
+  box-shadow: var(--shadow-sm);
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.chip.is-on {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--chip-color, var(--accent)) 55%, transparent);
+  background: color-mix(in srgb, var(--chip-color, var(--accent)) 26%, var(--surface-solid));
+}
+.chip--all.is-on {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+}
 
 /* ---------------- แถบแจ้งเตือนใหญ่ ---------------- */
 
 .alert-banner {
   position: absolute;
-  top: calc(var(--topbar-h) + 22px);
+  top: var(--below-filters);
   left: 50%;
   transform: translate(-50%, -12px);
   z-index: 40;
-  width: min(520px, calc(100vw - 32px));
+  width: min(520px, calc(100cqw - 32px));
   display: flex;
   align-items: center;
   gap: 14px;
@@ -199,9 +420,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .sidebar {
   position: absolute;
-  top: calc(var(--topbar-h) + 22px);
-  left: 12px;
-  bottom: 12px;
+  top: var(--below-topbar);
+  left: max(12px, var(--safe-l));
+  bottom: max(12px, var(--safe-b));
   width: 340px;
   z-index: 15;
   border-radius: var(--radius);
@@ -211,55 +432,191 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 .sidebar__head {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px 8px;
 }
-.sidebar__head h2 { margin: 0; font-size: 17px; letter-spacing: -0.2px; }
+.sidebar__head h2 { margin: 0; font-size: 18px; letter-spacing: -0.2px; }
+
+.sidebar__title { display: flex; align-items: center; gap: 9px; min-width: 0; }
 
 .chip-count {
-  min-width: 26px;
-  height: 22px;
+  min-width: 24px;
+  height: 24px;
   padding: 0 7px;
-  border-radius: 11px;
+  border-radius: 999px;
   background: var(--accent);
   color: #fff;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   display: grid;
   place-items: center;
 }
 
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.pill-btn {
+  flex: none;
+  height: 32px;
   padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
-.chip {
+/* ---------------- ป้ายความเสี่ยงบนแผนที่ ---------------- */
+
+.risk-chip {
+  --risk-color: var(--ok);
+  position: absolute;
+  top: var(--below-filters);
+  left: max(12px, var(--safe-l));
+  z-index: 17;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  font-size: 12px;
+  gap: 7px;
+  height: 36px;
+  padding: 0 13px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-dim);
-  transition: all 0.15s ease;
+  border: 1px solid color-mix(in srgb, var(--risk-color) 45%, transparent);
+  background: var(--surface);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: var(--shadow-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: opacity 0.2s ease;
 }
-.chip.is-on {
-  color: var(--text);
-  border-color: var(--chip-color);
-  background: color-mix(in srgb, var(--chip-color) 16%, transparent);
+.risk-chip__dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--risk-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--risk-color) 25%, transparent);
+}
+.risk-chip__score {
+  font-weight: 700;
+  color: var(--risk-color);
+  font-variant-numeric: tabular-nums;
+}
+/* ระดับอันตรายมาก ให้กะพริบเรียกสายตา */
+.risk-chip[data-level='critical'] .risk-chip__dot { animation: livePulse 1.6s infinite; }
+
+/* ---------------- สรุปความเสี่ยง ---------------- */
+
+.risk {
+  --risk-color: var(--ok); /* ค่าเริ่มต้นก่อน JS วาดครั้งแรก */
+  margin: 2px 14px 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--risk-color) 35%, transparent);
+  background: color-mix(in srgb, var(--risk-color) 10%, transparent);
 }
 
-.filters__actions {
+.risk__head {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.risk__title { font-size: 12.5px; font-weight: 600; color: var(--text-dim); }
+.risk__level {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--risk-color);
+}
+/* พื้นเขียว/เหลืองสว่าง ตัวอักษรขาวอ่านไม่ออก จึงสลับเป็นตัวอักษรเข้ม */
+.risk[data-level='low'] .risk__level,
+.risk[data-level='medium'] .risk__level { color: #0b0f18; }
+
+.risk__meter {
+  height: 7px;
+  margin: 9px 0 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  overflow: hidden;
+}
+.risk__bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--risk-color) 55%, white), var(--risk-color));
+  transition: width 0.4s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.risk__level { font-variant-numeric: tabular-nums; }
+
+.risk__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  text-align: center;
+}
+.risk__stats div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.risk__stats strong { font-size: 14px; }
+.risk__stats span { font-size: 10.5px; color: var(--text-dim); line-height: 1.3; }
+
+.risk__advice {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #a8b0c2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------------- ตัวกรองแบบเต็มในแผ่นซ้อน ---------------- */
+
+.filter-list { display: flex; flex-direction: column; }
+
+.filter-row {
+  display: flex;
+  align-items: center;
   gap: 12px;
-  padding: 8px 16px 4px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  text-align: left;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  background: none;
+  width: 100%;
+}
+.filter-row__icon {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--row-color) 20%, transparent);
+}
+.filter-row__label { flex: 1; font-size: 14px; }
+.filter-row__check {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: transparent;
+}
+.filter-row.is-on .filter-row__check {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
 }
 
 .link-btn {
@@ -273,70 +630,86 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .hazard-list {
   list-style: none;
-  margin: 6px 0 0;
-  padding: 0 10px 10px;
+  margin: 4px 0 0;
+  padding: 0 14px 12px;
   overflow-y: auto;
   flex: 1;
   scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
+/* การ์ดหนึ่งใบต่อหนึ่งรายงาน — ชื่อถนนเป็นตัวเด่น มีลูกศรบอกว่ากดดูต่อได้ */
 .hazard-item {
   display: flex;
-  gap: 10px;
-  padding: 10px;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 12px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
-  border-left: 3px solid transparent;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
-.hazard-item:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.hazard-item:hover { border-color: color-mix(in srgb, var(--item-color) 45%, transparent); }
 .hazard-item.is-selected {
-  background: color-mix(in srgb, var(--item-color) 14%, transparent);
-  border-left-color: var(--item-color);
+  border-color: var(--item-color);
+  background: color-mix(in srgb, var(--item-color) 14%, var(--surface-raised));
 }
 
 .hazard-item__icon {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   flex: none;
   display: grid;
   place-items: center;
-  font-size: 18px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--item-color) 18%, transparent);
+  font-size: 21px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--item-color) 22%, transparent);
 }
 
 .hazard-item__body { min-width: 0; flex: 1; }
 .hazard-item__top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 7px;
 }
-.hazard-item__top strong { font-size: 14px; }
-.hazard-item__road {
-  font-size: 12.5px;
+.hazard-item__top strong {
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--text-dim);
-  margin-top: 1px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hazard-item__note {
-  font-size: 12px;
-  color: var(--text-dim);
+.hazard-item__road {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text);
   margin-top: 3px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .hazard-item__meta {
   display: flex;
-  gap: 10px;
+  gap: 6px;
   margin-top: 5px;
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-dim);
+}
+.hazard-item__meta span:not(:first-child)::before {
+  content: '·';
+  margin-right: 6px;
+}
+
+.hazard-item__go {
+  flex: none;
+  font-size: 17px;
+  color: var(--text-dim);
+  opacity: 0.7;
 }
 
 .sev {
@@ -346,14 +719,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-radius: 999px;
   flex: none;
 }
-.sev--low { background: rgba(48, 209, 88, 0.18); color: #1f9e4a; }
-.sev--medium { background: rgba(255, 159, 10, 0.2); color: #b9700a; }
-.sev--high { background: rgba(255, 59, 48, 0.18); color: #d32b21; }
-@media (prefers-color-scheme: dark) {
-  .sev--low { color: #4ade80; }
-  .sev--medium { color: #fbbf5c; }
-  .sev--high { color: #ff6961; }
-}
+.sev--low { background: rgba(48, 209, 88, 0.16); color: #4ade80; }
+.sev--medium { background: rgba(255, 159, 10, 0.18); color: #fbbf5c; }
+.sev--high { background: rgba(255, 69, 58, 0.18); color: #ff6961; }
 
 .empty-state {
   text-align: center;
@@ -376,43 +744,45 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ---------------- ปุ่มควบคุมแผนที่ ---------------- */
 
+/* รวมปุ่มควบคุมเป็นการ์ดเดียว ลดความรกทางขวาของจอ */
 .map-controls {
   position: absolute;
-  right: 12px;
-  top: calc(var(--topbar-h) + 22px);
+  right: max(12px, var(--safe-r));
+  top: var(--below-topbar);
   z-index: 18;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: var(--shadow-sm);
 }
 
 .map-btn {
   width: 42px;
   height: 42px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: var(--shadow-sm);
+  border: 0;
+  border-radius: 0;
+  background: none;
   display: grid;
   place-items: center;
   font-size: 15px;
   font-weight: 600;
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition: background 0.15s ease;
 }
-.map-btn:hover { transform: scale(1.06); }
-.map-btn.is-active { background: var(--accent); color: #fff; border-color: transparent; }
+.map-btn + .map-btn,
+.map-btn-group { border-top: 1px solid var(--border); }
+.map-btn:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
+.map-btn:active { transform: none; }
+.map-btn.is-active { background: var(--accent); color: #fff; }
+/* เข็มทิศจะโผล่เฉพาะตอนแผนที่ถูกหมุนออกจากทิศเหนือ */
+.map-btn.is-hidden { display: none; }
 
-.map-btn-group {
-  display: flex;
-  flex-direction: column;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-}
-.map-btn-group .map-btn { border-radius: 0; box-shadow: none; }
-.map-btn-group .map-btn + .map-btn { border-top: 0; }
+.map-btn-group { display: flex; flex-direction: column; }
+.map-btn-group .map-btn + .map-btn { border-top: 1px solid var(--border); }
 
 .compass svg { transition: transform 0.15s ease-out; }
 
@@ -420,8 +790,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .fab {
   position: absolute;
-  right: 16px;
-  bottom: 20px;
+  right: max(16px, var(--safe-r));
+  bottom: max(20px, calc(var(--safe-b) + 12px));
   z-index: 22;
   display: inline-flex;
   align-items: center;
@@ -440,34 +810,36 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .fab:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(255, 69, 58, 0.5); }
 .fab__icon { font-size: 20px; font-weight: 400; }
 
-/* ---------------- การ์ดรายละเอียด ---------------- */
+/* ---------------- หน้ารายละเอียด (อยู่ในแผ่นเดียวกัน) ---------------- */
 
-.detail-card {
-  position: absolute;
-  left: 50%;
-  bottom: 20px;
-  transform: translateX(-50%);
-  z-index: 21;
-  width: min(440px, calc(100vw - 24px));
-  border-radius: var(--radius);
-  padding: 16px;
-  border-top: 3px solid var(--card-color, var(--accent));
-  animation: cardIn 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+/* โหมดปกติ: ซ่อนหน้ารายละเอียดกับปุ่มย้อนกลับไว้ */
+.sheet-detail,
+#btnBack { display: none; }
+
+/* โหมดรายละเอียด: สลับเนื้อหาในแผ่นทั้งใบ ไม่มีการ์ดลอยซ้อนอีกชั้น */
+.sidebar.is-detail #btnBack { display: inline-flex; }
+.sidebar.is-detail .sidebar__title,
+.sidebar.is-detail #btnFilter,
+.sidebar.is-detail #riskPanel,
+.sidebar.is-detail #hazardList,
+.sidebar.is-detail .sidebar__foot { display: none; }
+
+.sidebar.is-detail .sheet-detail {
+  display: block;
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 16px 16px;
+  animation: detailIn 0.24s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
-@keyframes cardIn {
-  from { opacity: 0; transform: translate(-50%, 16px); }
+@keyframes detailIn {
+  from { opacity: 0; transform: translateY(10px); }
 }
 
-.detail-card__close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  border: 0;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--text) 10%, transparent);
-  font-size: 12px;
+.detail-card__road {
+  margin: 14px 0 0;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
 }
 
 .detail-card__head { display: flex; gap: 12px; align-items: center; }
@@ -514,7 +886,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ---------------- แผ่นซ้อน (ฟอร์ม/ตั้งค่า) ---------------- */
 
 .sheet-backdrop {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 60;
   background: rgba(0, 0, 0, 0.35);
@@ -530,7 +902,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .sheet {
   width: min(480px, 100%);
-  max-height: min(88vh, 760px);
+  max-height: min(88cqh, 760px);
   overflow-y: auto;
   border-radius: 22px;
   padding: 18px;
@@ -539,6 +911,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
   transition: transform 0.24s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 .sheet-backdrop.is-open .sheet { transform: none; }
+
+.sheet__handle {
+  display: none;
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+  margin: 0 auto 14px;
+}
 
 .sheet__head {
   display: flex;
@@ -607,13 +988,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .text-input {
   width: 100%;
-  padding: 11px 13px;
+  padding: 12px 13px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--text) 4%, transparent);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: 16px;
   resize: vertical;
 }
 .text-input:focus {
@@ -664,7 +1045,35 @@ button { font: inherit; color: inherit; cursor: pointer; }
   font-size: 14px;
   cursor: pointer;
 }
-.switch-row input { width: 20px; height: 20px; accent-color: var(--accent); }
+/* สวิตช์แบบ iOS */
+.switch-row input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 51px;
+  height: 31px;
+  margin: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+  position: relative;
+  transition: background 0.22s ease;
+  cursor: pointer;
+}
+.switch-row input::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.28);
+  transition: translate 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.switch-row input:checked { background: var(--ok); }
+.switch-row input:checked::after { translate: 20px 0; }
+.switch-row input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .hint {
   font-size: 12px;
@@ -686,13 +1095,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   gap: 8px;
   align-items: center;
   pointer-events: none;
-  width: min(440px, calc(100vw - 32px));
+  width: min(440px, calc(100cqw - 32px));
 }
 
 .toast {
   padding: 10px 16px;
   border-radius: 999px;
-  background: rgba(28, 28, 30, 0.92);
+  background: rgba(12, 16, 25, 0.94);
+  border: 1px solid var(--border);
   color: #fff;
   font-size: 13px;
   box-shadow: var(--shadow);
@@ -708,45 +1118,58 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ---------------- หมุดบนแผนที่ ---------------- */
 
+/*
+ * ห้ามแตะ transform หรือ transition ของ .hazard-marker เด็ดขาด
+ * MapLibre ใช้ transform ของ element นี้วางหมุดตามพิกัดทุกเฟรม
+ * ถ้าเราใส่ transition ทับ หมุดจะไล่ตามช้ากว่าแผนที่จนดูเหมือนลอยตามจอ
+ * ต้องการย่อ/ขยายให้ทำที่ลูก (.hazard-marker__pin) แทน
+ */
 .hazard-marker {
   position: relative;
-  width: 40px;
-  height: 52px;
+  width: 46px;
+  height: 58px;
   cursor: pointer;
-  transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1);
-  transform-origin: bottom center;
 }
-.hazard-marker:hover { transform: scale(1.12); }
-.hazard-marker.is-selected { transform: scale(1.22); z-index: 5; }
+.hazard-marker:hover { --pin-scale: 1.12; }
+.hazard-marker.is-selected { --pin-scale: 1.28; z-index: 5; }
+/* อยู่นอกกรอบแผนที่ — ต้องซ่อน ไม่งั้นจะโผล่ลอยกลางจอ */
+.hazard-marker.is-offscreen { display: none; }
 
+/* ป้ายสี่เหลี่ยมมุมมนพร้อมหางแหลม อ่านง่ายกว่าหมุดหยดน้ำบนพื้นมืด */
 .hazard-marker__pin {
   position: absolute;
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 38px;
-  height: 38px;
-  border-radius: 50% 50% 50% 8px;
-  rotate: -45deg;
-  background: linear-gradient(150deg,
-    color-mix(in srgb, var(--pin-color) 88%, white),
+  width: 44px;
+  height: 44px;
+  /* --marker-scale มาจากระดับซูม, --pin-scale มาจาก hover/การเลือก */
+  transform: translateX(-50%) scale(calc(var(--marker-scale, 1) * var(--pin-scale, 1)));
+  transform-origin: bottom center;
+  transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1);
+  border-radius: 14px;
+  background: linear-gradient(155deg,
+    color-mix(in srgb, var(--pin-color) 82%, white),
     var(--pin-color));
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.32);
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55),
+    0 0 0 4px color-mix(in srgb, var(--pin-color) 22%, transparent);
   display: grid;
   place-items: center;
 }
-.hazard-marker__icon { rotate: 45deg; font-size: 17px; line-height: 1; }
-
-.hazard-marker__stem {
+/* หางชี้ลงหาพิกัดจริง */
+.hazard-marker__pin::after {
+  content: '';
   position: absolute;
-  bottom: 8px;
+  bottom: -5px;
   left: 50%;
-  transform: translateX(-50%);
-  width: 2px;
-  height: 8px;
-  background: color-mix(in srgb, var(--pin-color) 70%, transparent);
+  width: 10px;
+  height: 10px;
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 2px;
+  background: var(--pin-color);
 }
+.hazard-marker__icon { font-size: 21px; line-height: 1; }
 
 .hazard-marker__shadow {
   position: absolute;
@@ -809,13 +1232,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ---------------- โหมดเลือกจุด ---------------- */
 
-body.picking::after {
+body.picking .phone > #map::after {
   content: 'แตะจุดบนแผนที่เพื่อระบุตำแหน่งเหตุ';
   position: absolute;
-  top: calc(var(--topbar-h) + 26px);
+  top: calc(var(--below-filters) + 4px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 70;
+  white-space: nowrap;
+  pointer-events: none;
   padding: 9px 18px;
   border-radius: 999px;
   background: var(--accent);
@@ -826,41 +1251,206 @@ body.picking::after {
 
 /* ---------------- MapLibre overrides ---------------- */
 
-.maplibregl-ctrl-bottom-right { margin-bottom: 4px; }
+/*
+ * สำรองกฎสำคัญของ MapLibre ไว้เอง เผื่อ CSS จาก CDN โหลดไม่สำเร็จ
+ * ถ้าขาดกฎพวกนี้ หมุดจะไม่ถูกวางแบบ absolute แล้วไหลไปเรียงต่อกัน
+ * เป็นแถวตั้งกลางจอ ห่างเท่า ๆ กันตามความสูงของหมุด และไม่ขยับตามแผนที่
+ */
+.maplibregl-map { position: relative; overflow: hidden; }
+.maplibregl-canvas-container, .maplibregl-canvas { position: absolute; top: 0; left: 0; }
+.maplibregl-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+}
+
+.maplibregl-ctrl-bottom-right {
+  margin-bottom: calc(var(--safe-b) + 4px);
+  margin-right: var(--safe-r);
+}
+.maplibregl-ctrl-bottom-left {
+  margin-bottom: calc(var(--safe-b) + 4px);
+  margin-left: var(--safe-l);
+}
 .maplibregl-ctrl-attrib {
   font-size: 10px;
   background: var(--surface) !important;
-  border-radius: 8px 0 0 0;
+  border-radius: 8px;
 }
 .maplibregl-ctrl-attrib a { color: var(--text-dim) !important; }
 
 /* ---------------- จอเล็ก ---------------- */
 
-@media (max-width: 860px) {
-  .only-mobile { display: grid; }
+@container phone (max-width: 860px) {
+  .icon-btn { width: 40px; height: 40px; }
 
-  .brand__text span { display: none; }
-  #trackLabel { display: none; }
-  .pill { padding: 0 12px; }
-  #btnSim { font-size: 0; padding: 0 12px; }
-  #btnSim::first-letter { font-size: 16px; }
-
+  /* แผ่นรายการแบบลากได้ — แผนที่ยังเลื่อนได้ตลอดเวลา เพราะไม่มีฉากหลังบัง */
   .sidebar {
     top: auto;
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
+    left: max(8px, var(--safe-l));
+    right: max(8px, var(--safe-r));
+    bottom: max(8px, var(--safe-b));
     width: auto;
-    height: 55vh;
-    transform: translateY(calc(100% + 16px));
-    transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+    /* สูงพอที่ระดับ "เต็ม" จะยังไม่บังแถบค้นหาและชิปกรองด้านบน */
+    height: 71cqh;
+    max-height: 680px;
+    transform: translateY(var(--sheet-shift, calc(100% + 16px)));
+    transition: transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1);
   }
-  .sidebar.is-open { transform: none; }
+  .sidebar.is-dragging { transition: none; }
 
-  .map-controls { top: auto; bottom: 88px; }
-  .detail-card { bottom: 88px; }
-  .toasts { bottom: 150px; }
-  .fab { padding: 0 18px; height: 48px; }
+  /* ระดับ "แง้ม" ยังกดแจ้งเหตุได้ จึงยกปุ่มขึ้นเหนือแผ่นแทนการซ่อน */
+  .sidebar[data-detent='peek'] ~ .fab {
+    bottom: calc(31cqh + 26px);
+    transition: bottom 0.32s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.2s ease;
+  }
+  .sidebar[data-detent='half'] ~ .fab,
+  .sidebar[data-detent='full'] ~ .fab {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  /* เปิดแผ่นแล้วมีการ์ดความเสี่ยงเต็มอยู่ข้างใน จึงซ่อนป้ายย่อ */
+  .sidebar.is-open ~ .risk-chip {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* ยกปุ่มควบคุมขึ้นอีกชั้น ไม่ให้ทับปุ่มแจ้งเหตุที่อยู่มุมเดียวกัน */
+  .sidebar[data-detent='peek'] ~ .map-controls {
+    bottom: calc(31cqh + 88px);
+    transition: bottom 0.32s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.2s ease;
+  }
+  .sidebar[data-detent='half'] ~ .map-controls,
+  .sidebar[data-detent='full'] ~ .map-controls {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  /* หัวแผ่นคือที่จับสำหรับลาก */
+  .sidebar__head {
+    padding-top: 14px;
+    touch-action: none;
+    cursor: grab;
+    user-select: none;
+  }
+  .sidebar.is-dragging .sidebar__head { cursor: grabbing; }
+  .sidebar__head::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 5px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--text) 22%, transparent);
+  }
+
+  /* ตัวกรองเลื่อนแนวนอนแถวเดียว ประหยัดพื้นที่แนวตั้ง */
+  .filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 2px 14px 6px;
+    margin-bottom: 2px;
+  }
+  .filters::-webkit-scrollbar { display: none; }
+  .chip {
+    padding: 9px 13px;
+    font-size: 12.5px;
+    flex: none;
+    white-space: nowrap;
+    scroll-snap-align: start;
+  }
+  .hazard-item { padding: 12px 10px; }
+  .hazard-item__icon { width: 40px; height: 40px; font-size: 19px; }
+
+  .map-controls { top: auto; bottom: max(88px, calc(var(--safe-b) + 76px)); right: max(12px, var(--safe-r)); }
+  .map-btn { width: 46px; height: 46px; font-size: 16px; }
+  .toasts { bottom: max(150px, calc(var(--safe-b) + 138px)); }
+  .fab { padding: 0 18px; height: 50px; }
+
+  .maplibregl-ctrl-attrib { max-width: 62cqw; }
+  .detail-card__stats span { font-size: 10.5px; }
+
+  /* แผ่นซ้อนแบบ bottom sheet เต็มขอบจอ */
+  .sheet-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .sheet {
+    width: 100%;
+    max-height: min(90cqh, 820px);
+    border-radius: 20px 20px 0 0;
+    padding: 12px 16px 0;
+    transform: translateY(100%);
+  }
+  /* แผ่นตั้งค่าไม่มีแถบปุ่มล่าง จึงต้องเว้นระยะเอง */
+  #settingsSheet .sheet { padding-bottom: calc(var(--safe-b) + 16px); }
+  .sheet-backdrop.is-open .sheet { transform: none; }
+  .sheet__handle { display: block; }
+
+  .location-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  /* ปุ่มยืนยันติดขอบล่างเสมอ ไม่ต้องเลื่อนหา */
+  .sheet__foot {
+    position: sticky;
+    bottom: 0;
+    gap: 10px;
+    margin-top: 18px;
+    padding: 12px 0 calc(var(--safe-b) + 12px);
+    background: var(--surface-solid);
+    box-shadow: 0 -1px 0 var(--border);
+  }
+  .sheet__foot .ghost-btn,
+  .sheet__foot .primary-btn {
+    flex: 1;
+    min-height: 48px;
+    border-radius: 14px;
+    font-size: 15px;
+  }
+  .ghost-btn { min-height: 44px; }
+  .segmented button { padding: 12px 8px; }
+  .switch-row { padding: 16px 2px; }
+}
+
+/* ---------------- ขนาดจอ iPhone (พอร์ตเทรต) ---------------- */
+
+@container phone (max-width: 480px) {
+  .topbar { padding: 0 10px; gap: 8px; }
+  .brand__mark { width: 34px; height: 34px; font-size: 17px; }
+  .brand__text strong { font-size: 15px; }
+  .topbar__status { gap: 6px; }
+
+  .type-grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
+  .type-card { padding: 9px 4px; font-size: 11px; }
+
+  .alert-banner { width: calc(100cqw - max(24px, calc(var(--safe-l) + var(--safe-r) + 16px))); }
+  .fab__label { font-size: 14px; }
+}
+
+/* จอแคบ (iPhone SE / mini) — ย่อปุ่มลงเพื่อให้ชื่อแอปยังอยู่ครบ */
+@container phone (max-width: 385px) {
+  .topbar { padding: 0 8px; gap: 6px; }
+  .topbar__status { gap: 5px; }
+  .icon-btn { width: 38px; height: 38px; font-size: 14px; }
+  .brand { gap: 8px; }
+  .brand__mark { width: 34px; height: 34px; font-size: 17px; }
+  .brand__text strong { font-size: 14.5px; }
+}
+
+/* แคบมากจริง ๆ — ยอมซ่อนชื่อแอป เหลือโลโก้ */
+@container phone (max-width: 330px) {
+  .brand__text { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

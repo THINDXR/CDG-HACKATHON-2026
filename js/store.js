@@ -13,6 +13,7 @@ window.Store = (function () {
     userHeading: null,  // องศา
     following: false,
     simulating: false,
+    search: '',
   };
 
   function emit(reason) {
@@ -131,21 +132,126 @@ window.Store = (function () {
 
   /* ---------- selectors ---------- */
 
+  /** รายงานที่ผ่านทั้งตัวกรองประเภทและคำค้น (ใช้ทั้งรายการและหมุดบนแผนที่) */
   function visibleReports() {
+    const q = state.search.trim().toLowerCase();
+    return state.reports.filter((r) => {
+      if (!state.activeTypes.has(r.type)) return false;
+      if (!q) return true;
+      const label = CFG.HAZARD_TYPES[r.type].label;
+      return (
+        r.road.toLowerCase().includes(q) ||
+        r.note.toLowerCase().includes(q) ||
+        label.toLowerCase().includes(q)
+      );
+    });
+  }
+
+  function setSearch(text) {
+    state.search = text || '';
+    emit('search');
+  }
+
+  /** รายงานที่ผ่านตัวกรองประเภท (ไม่สนคำค้น) — ใช้ประเมินความเสี่ยง */
+  function typeFilteredReports() {
     return state.reports.filter((r) => state.activeTypes.has(r.type));
+  }
+
+  function withDistance(list, origin) {
+    const out = list.map((r) => ({
+      ...r,
+      distance: origin ? U.distance(origin, [r.lng, r.lat]) : null,
+    }));
+    out.sort((a, b) => {
+      if (a.distance == null || b.distance == null) return b.createdAt - a.createdAt;
+      return a.distance - b.distance;
+    });
+    return out;
   }
 
   /** รายงานที่มองเห็น เรียงตามระยะห่างจากจุดอ้างอิง */
   function sortedByDistance(origin) {
-    const list = visibleReports().map((r) => ({
-      ...r,
-      distance: origin ? U.distance(origin, [r.lng, r.lat]) : null,
-    }));
-    list.sort((a, b) => {
-      if (a.distance == null || b.distance == null) return b.createdAt - a.createdAt;
-      return a.distance - b.distance;
-    });
-    return list;
+    return withDistance(visibleReports(), origin);
+  }
+
+  /* ---------- ประเมินความเสี่ยงของพื้นที่รอบตัว ---------- */
+
+  // รัศมีที่นำมาคิดคะแนน (เมตร) — ไกลกว่านี้ถือว่าไม่กระทบการขับตอนนี้
+  const RISK_RADIUS = 5000;
+
+  // เรียงจากรุนแรงมากไปน้อย เพื่อให้ find() คืนระดับแรกที่ถึงเกณฑ์
+  const RISK_LEVELS = [
+    {
+      min: 70, key: 'critical', label: 'อันตรายมาก', color: '#ff3b30',
+      advice: 'เสี่ยงสูงมาก แนะนำเลี่ยงเส้นทางนี้ถ้าทำได้',
+    },
+    {
+      min: 45, key: 'high', label: 'เสี่ยงสูง', color: '#ff9f0a',
+      advice: 'ลดความเร็วและเว้นระยะห่างให้มากกว่าปกติ',
+    },
+    {
+      min: 20, key: 'medium', label: 'เฝ้าระวัง', color: '#d4a017',
+      advice: 'มีจุดต้องระวังใกล้เคียง เผื่อเวลาเดินทางไว้',
+    },
+    {
+      min: 0, key: 'low', label: 'ปลอดภัย', color: '#30d158',
+      advice: 'เส้นทางรอบตัวโล่ง ขับขี่ตามปกติอย่างมีสติ',
+    },
+  ];
+
+  // ระยะที่ถือว่าภัย "ประชิดตัว" — ใช้คิดคะแนนภัยเร่งด่วน (เมตร)
+  const RISK_IMMEDIATE = 1500;
+
+  /**
+   * คะแนนความเสี่ยง 0-100 จากภัยที่มองเห็นในรัศมี RISK_RADIUS
+   *
+   * ใช้ค่าที่สูงกว่าระหว่างสองมุมมอง:
+   *  - density  = ภาพรวมความหนาแน่นของภัยรอบตัว ใช้เส้นโค้งอิ่มตัว
+   *               ไม่ให้เมืองที่มีรายงานเยอะชนเพดาน 100 ตลอดเวลา
+   *  - immediate = ภัยรุนแรงที่อยู่ประชิดตัวจุดเดียวก็ทำให้เสี่ยงสูงได้
+   */
+  function riskAssessment(origin) {
+    // ตั้งใจไม่ใช้คำค้น: พิมพ์ชื่อสถานที่ในช่องค้นหาไม่ควรทำให้ความเสี่ยงกลายเป็น "ปลอดภัย"
+    const nearby = withDistance(typeFilteredReports(), origin).filter(
+      (r) => r.distance == null || r.distance <= RISK_RADIUS
+    );
+
+    let raw = 0;
+    let immediate = 0;
+    let high = 0;
+    const byType = {};
+
+    for (const r of nearby) {
+      const severity = CFG.SEVERITY[r.severity].weight; // 1-3
+      // ยิ่งไกลยิ่งลดเร็ว (กำลังสอง) ภัยที่ 4 กม. แทบไม่มีผล
+      const far = r.distance == null ? 0.5 : (1 - r.distance / RISK_RADIUS) ** 2;
+      // รายงานที่ถูกปฏิเสธมากกว่ายืนยัน ให้ลดน้ำหนักลง (ต่ำสุด 0.4)
+      const trust = Math.max(0.4, (r.confirms + 1) / (r.confirms + r.denies + 1));
+
+      raw += severity * (0.15 + 0.85 * far) * trust;
+
+      if (r.distance != null) {
+        const closeness = Math.max(0, 1 - r.distance / RISK_IMMEDIATE);
+        immediate = Math.max(immediate, (severity / 3) * closeness * trust * 100);
+      }
+
+      if (r.severity === 'high') high += 1;
+      byType[r.type] = (byType[r.type] || 0) + 1;
+    }
+
+    const density = 100 * (1 - Math.exp(-raw / 20));
+    const score = Math.round(Math.min(100, Math.max(density, immediate)));
+    const dominant = Object.entries(byType).sort((a, b) => b[1] - a[1])[0];
+
+    return {
+      score,
+      level: RISK_LEVELS.find((l) => score >= l.min),
+      count: nearby.length,
+      high,
+      nearest: nearby.length ? nearby[0] : null,
+      dominantType: dominant ? dominant[0] : null,
+      radius: RISK_RADIUS,
+    };
   }
 
   function toGeoJSON() {
@@ -216,12 +322,14 @@ window.Store = (function () {
     vote,
     toggleType,
     setAllTypes,
+    setSearch,
     select,
     setUserPosition,
     setFollowing,
     setSimulating,
     visibleReports,
     sortedByDistance,
+    riskAssessment,
     toGeoJSON,
     resetToSeed,
   };

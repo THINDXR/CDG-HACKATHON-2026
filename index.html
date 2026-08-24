@@ -2,8 +2,14 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <meta name="description" content="ระบบเตือนภัยบนท้องถนนแบบเรียลไทม์ พร้อมแผนที่ 3 มิติ" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="RoadWarn" />
+  <meta name="theme-color" content="#0b0f18" />
+  <meta name="color-scheme" content="dark" />
   <title>RoadWarn · เตือนภัยบนท้องถนน</title>
 
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css" />
@@ -11,6 +17,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚠️</text></svg>" />
 </head>
 <body>
+<div id="phone" class="phone">
   <div id="map" aria-label="แผนที่สามมิติแสดงจุดเตือนภัย"></div>
 
   <!-- แถบบนสุด -->
@@ -24,15 +31,26 @@
     </div>
 
     <div class="topbar__status">
-      <button id="btnTrack" class="pill" type="button">
-        <span class="pill__dot"></span>
-        <span id="trackLabel">เริ่มติดตามตำแหน่ง</span>
-      </button>
-      <button id="btnSim" class="pill pill--ghost" type="button">🚙 จำลองการขับ</button>
+      <button id="btnMute" class="icon-btn" type="button" title="เปิด/ปิดเสียงเตือน" aria-label="เสียงเตือน">🔔</button>
       <button id="btnSettings" class="icon-btn" type="button" title="ตั้งค่าการแจ้งเตือน" aria-label="ตั้งค่า">⚙️</button>
-      <button id="btnPanel" class="icon-btn only-mobile" type="button" aria-label="รายการภัย">☰</button>
     </div>
   </header>
+
+  <!-- ค้นหา -->
+  <div class="searchbar glass">
+    <span class="searchbar__icon" aria-hidden="true">🔍</span>
+    <input id="searchInput" class="searchbar__input" type="search" autocomplete="off"
+           placeholder="ค้นหาถนน หรือสถานที่..." aria-label="ค้นหาถนนหรือสถานที่" />
+    <button id="btnTrack" class="searchbar__locate" type="button" title="ติดตามตำแหน่งของฉัน" aria-label="ติดตามตำแหน่ง">
+      <span id="trackLabel" aria-hidden="true">📍</span>
+    </button>
+  </div>
+
+  <!-- ผลค้นหาสถานที่จริง -->
+  <div id="searchResults" class="search-results glass" hidden role="listbox" aria-label="ผลการค้นหาสถานที่"></div>
+
+  <!-- ชิปกรองประเภทภัย -->
+  <div class="quickfilters" id="quickFilters" role="group" aria-label="กรองประเภทภัย"></div>
 
   <!-- แถบแจ้งเตือนใหญ่ -->
   <div id="alertBanner" class="alert-banner" role="alert" aria-live="assertive" hidden>
@@ -44,20 +62,22 @@
     <button class="alert-banner__close" id="alertClose" type="button" aria-label="ปิด">✕</button>
   </div>
 
-  <!-- แผงด้านข้าง -->
+  <!-- แผ่นรายการภัย -->
   <aside id="sidebar" class="sidebar glass">
     <div class="sidebar__head">
-      <h2>ภัยใกล้คุณ</h2>
-      <span id="sidebarCount" class="chip-count">0</span>
+      <div class="sidebar__title">
+        <h2>ภัยใกล้คุณ</h2>
+        <span id="sidebarCount" class="chip-count">0</span>
+      </div>
+      <button id="btnBack" class="pill-btn" type="button">‹ กลับ</button>
+      <button id="btnFilter" class="pill-btn" type="button">กรองข้อมูล</button>
     </div>
 
-    <div class="filters" id="filters" role="group" aria-label="กรองประเภทภัย"></div>
-    <div class="filters__actions">
-      <button class="link-btn" id="filterAll" type="button">เลือกทั้งหมด</button>
-      <button class="link-btn" id="filterNone" type="button">ล้างตัวกรอง</button>
-    </div>
+    <section id="riskPanel" class="risk" aria-live="polite" aria-label="ระดับความเสี่ยงรอบตัว"></section>
 
     <ul id="hazardList" class="hazard-list"></ul>
+
+    <section id="sheetDetail" class="sheet-detail" aria-live="polite"></section>
 
     <div class="sidebar__foot">
       <span id="statsLine">—</span>
@@ -65,17 +85,23 @@
     </div>
   </aside>
 
+  <!-- ป้ายความเสี่ยงบนแผนที่ (แสดงเมื่อปิดแผ่นรายการ) -->
+  <button id="riskChip" class="risk-chip" type="button">
+    <span class="risk-chip__dot"></span>
+    <span class="risk-chip__label">กำลังประเมิน…</span>
+    <span class="risk-chip__score"></span>
+  </button>
+
   <!-- ปุ่มควบคุมแผนที่ -->
   <div class="map-controls">
     <button class="map-btn compass" id="btnCompass" type="button" title="หันไปทางทิศเหนือ" aria-label="ทิศเหนือ">
       <svg id="compassNeedle" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-        <polygon points="12,3 15.5,13 12,11 8.5,13" fill="#ff3b30"></polygon>
+        <polygon points="12,3 15.5,13 12,11 8.5,13" fill="#ff453a"></polygon>
         <polygon points="12,21 8.5,11 12,13 15.5,11" fill="#8e8e93"></polygon>
       </svg>
     </button>
     <button class="map-btn" id="btn3D" type="button" title="สลับมุมมอง 3 มิติ">3D</button>
     <button class="map-btn" id="btnLayers" type="button" title="สลับแผนที่ดาวเทียม">🛰️</button>
-    <button class="map-btn" id="btnLocate" type="button" title="ไปยังตำแหน่งของฉัน">◎</button>
     <div class="map-btn-group">
       <button class="map-btn" id="btnZoomIn" type="button" aria-label="ขยาย">＋</button>
       <button class="map-btn" id="btnZoomOut" type="button" aria-label="ย่อ">－</button>
@@ -88,12 +114,10 @@
     <span class="fab__label">แจ้งเหตุ</span>
   </button>
 
-  <!-- การ์ดรายละเอียดภัยที่เลือก -->
-  <section id="detailCard" class="detail-card glass" hidden aria-live="polite"></section>
-
   <!-- ฟอร์มแจ้งเหตุ -->
   <div id="reportSheet" class="sheet-backdrop" hidden>
     <form class="sheet glass" id="reportForm">
+      <div class="sheet__handle" aria-hidden="true"></div>
       <header class="sheet__head">
         <h2>แจ้งเหตุบนถนน</h2>
         <button type="button" class="icon-btn" id="reportClose" aria-label="ปิด">✕</button>
@@ -130,9 +154,26 @@
     </form>
   </div>
 
+  <!-- ตัวกรองแบบเต็ม -->
+  <div id="filterSheet" class="sheet-backdrop" hidden>
+    <div class="sheet glass">
+      <div class="sheet__handle" aria-hidden="true"></div>
+      <header class="sheet__head">
+        <h2>กรองข้อมูล</h2>
+        <button type="button" class="icon-btn" id="filterClose" aria-label="ปิด">✕</button>
+      </header>
+      <div id="filterList" class="filter-list"></div>
+      <footer class="sheet__foot">
+        <button type="button" class="ghost-btn" id="filterNone">ล้างทั้งหมด</button>
+        <button type="button" class="primary-btn" id="filterAll">เลือกทั้งหมด</button>
+      </footer>
+    </div>
+  </div>
+
   <!-- ตั้งค่า -->
   <div id="settingsSheet" class="sheet-backdrop" hidden>
     <div class="sheet glass">
+      <div class="sheet__handle" aria-hidden="true"></div>
       <header class="sheet__head">
         <h2>ตั้งค่าการแจ้งเตือน</h2>
         <button type="button" class="icon-btn" id="settingsClose" aria-label="ปิด">✕</button>
@@ -149,6 +190,10 @@
         <span>สั่นเตือน (มือถือ)</span>
         <input type="checkbox" id="setVibrate" />
       </label>
+      <label class="switch-row">
+        <span>โหมดจำลองการขับ 🚙</span>
+        <input type="checkbox" id="setSim" />
+      </label>
       <p class="hint">
         ระบบจะเตือนเมื่อมีภัยอยู่ในเส้นทางข้างหน้าภายในระยะประมาณ 900 เมตร
         และจะไม่เตือนซ้ำจุดเดิมภายใน 5 นาที
@@ -157,10 +202,12 @@
   </div>
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
+</div>
 
   <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
   <script src="js/config.js"></script>
   <script src="js/utils.js"></script>
+  <script src="js/geocode.js"></script>
   <script src="js/store.js"></script>
   <script src="js/map.js"></script>
   <script src="js/alerts.js"></script>

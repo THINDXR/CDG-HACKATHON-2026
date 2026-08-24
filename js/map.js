@@ -47,14 +47,19 @@ window.MapView = (function () {
       bearing: CFG.DEFAULT_BEARING,
       maxPitch: 85,
       antialias: true,
-      attributionControl: { compact: true },
+      attributionControl: false,
       hash: false,
     });
+
+    // มุมขวาล่างมีปุ่มแจ้งเหตุอยู่แล้ว จึงย้ายที่มาข้อมูลไปมุมซ้ายล่าง
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
 
     map.on('style.load', () => {
       applySceneEnhancements();
       addHazardLayers();
       refreshHazards();
+      // ตอน style.load บางครั้ง source ยังไม่พร้อม วงรัศมีจึงยังว่าง — วาดซ้ำเมื่อนิ่งแล้ว
+      map.once('idle', refreshHazards);
       if (!ready) {
         ready = true;
         readyQueue.splice(0).forEach((fn) => fn());
@@ -69,6 +74,8 @@ window.MapView = (function () {
 
     map.on('rotate', updateCompass);
     map.on('pitch', updateCompass);
+    map.on('move', updateMarkerView);
+    map.on('zoom', updateMarkerView);
 
     // ผู้ใช้ลากแผนที่เอง = เลิกโหมดตามตำแหน่ง
     map.on('dragstart', () => {
@@ -107,11 +114,11 @@ window.MapView = (function () {
     // ท้องฟ้าและหมอกระยะไกล ให้ความรู้สึกลึกแบบแผนที่ 3 มิติ
     try {
       map.setSky({
-        'sky-color': '#8ec5ff',
+        'sky-color': '#111a2c',
         'sky-horizon-blend': 0.6,
-        'horizon-color': '#dfeeff',
+        'horizon-color': '#243247',
         'horizon-fog-blend': 0.7,
-        'fog-color': '#e9f1fb',
+        'fog-color': '#0b0f18',
         'fog-ground-blend': 0.05,
         'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.9, 12, 0.4, 16, 0.1],
       });
@@ -142,9 +149,9 @@ window.MapView = (function () {
         paint: {
           'fill-extrusion-color': [
             'interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 10],
-            0, '#e6e6ec',
-            40, '#eeeef3',
-            120, '#f7f7fb',
+            0, '#232b3d',
+            40, '#2e384e',
+            120, '#3b475f',
           ],
           'fill-extrusion-height': [
             'interpolate', ['linear'], ['zoom'],
@@ -162,6 +169,9 @@ window.MapView = (function () {
 
   /* ---------- เลเยอร์ภัย ---------- */
 
+  // ต่ำกว่านี้วงรัศมีเล็กจนไม่สื่อความหมาย มีแต่ทำให้จอรก จึงซ่อนไปเลย
+  const ZONE_MIN_ZOOM = 12.5;
+
   function addHazardLayers() {
     if (!map.getSource('hazard-zones')) {
       map.addSource('hazard-zones', {
@@ -169,14 +179,54 @@ window.MapView = (function () {
         data: { type: 'FeatureCollection', features: [] },
       });
     }
+    // แสงเรืองรอบขอบเขตพื้นที่เสี่ยง — ติดอยู่กับพื้นแผนที่ ไม่เลื่อนตามจอ
+    // ความหนาต้องผูกกับระดับซูม ไม่งั้นตอนซูมออกวงจะกลายเป็นก้อนเบลอเต็มจอ
+    if (!map.getLayer('hazard-zone-glow')) {
+      map.addLayer({
+        id: 'hazard-zone-glow',
+        type: 'line',
+        source: 'hazard-zones',
+        minzoom: ZONE_MIN_ZOOM,
+        paint: {
+          'line-color': ['get', 'color'],
+          // ซูมใกล้มาก วงจะใหญ่จนแสงเรืองกลายเป็นแผ่นแดงทับทั้งจอ จึงบางลงอีกครั้ง
+          'line-width': [
+            'interpolate', ['linear'], ['zoom'],
+            ZONE_MIN_ZOOM, 3,
+            15, ['case', ['get', 'selected'], 18, 10],
+            17.5, ['case', ['get', 'selected'], 7, 4],
+          ],
+          'line-blur': [
+            'interpolate', ['linear'], ['zoom'],
+            ZONE_MIN_ZOOM, 2,
+            15, ['case', ['get', 'selected'], 14, 9],
+            17.5, ['case', ['get', 'selected'], 5, 3],
+          ],
+          'line-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            ZONE_MIN_ZOOM, 0,
+            14, ['case', ['get', 'selected'], 0.55, 0.34],
+            17.5, ['case', ['get', 'selected'], 0.28, 0.16],
+          ],
+        },
+      });
+    }
     if (!map.getLayer('hazard-zone-fill')) {
       map.addLayer({
         id: 'hazard-zone-fill',
         type: 'fill',
         source: 'hazard-zones',
+        minzoom: ZONE_MIN_ZOOM,
         paint: {
           'fill-color': ['get', 'color'],
-          'fill-opacity': ['case', ['get', 'selected'], 0.22, 0.1],
+          // ซูมใกล้ วงรัศมีจะกินทั้งจอ จึงจางลงตามระดับซูม
+          'fill-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            ZONE_MIN_ZOOM, 0,
+            13.5, ['case', ['get', 'selected'], 0.22, 0.12],
+            16.5, ['case', ['get', 'selected'], 0.07, 0.035],
+            18, ['case', ['get', 'selected'], 0.04, 0.02],
+          ],
         },
       });
     }
@@ -185,10 +235,15 @@ window.MapView = (function () {
         id: 'hazard-zone-line',
         type: 'line',
         source: 'hazard-zones',
+        minzoom: ZONE_MIN_ZOOM,
         paint: {
           'line-color': ['get', 'color'],
           'line-width': ['case', ['get', 'selected'], 2.5, 1.2],
-          'line-opacity': ['case', ['get', 'selected'], 0.9, 0.45],
+          'line-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            ZONE_MIN_ZOOM, 0,
+            13.5, ['case', ['get', 'selected'], 0.9, 0.45],
+          ],
         },
       });
     }
@@ -234,9 +289,15 @@ window.MapView = (function () {
     }
   }
 
-  /** วาดหมุดและวงรัศมีใหม่ทั้งหมดตามข้อมูลปัจจุบัน */
+  /**
+   * วาดหมุดและวงรัศมีใหม่ทั้งหมดตามข้อมูลปัจจุบัน
+   *
+   * หมุดเป็น DOM overlay จึงวาดได้ทันทีโดยไม่ต้องรอสไตล์
+   * มีแต่วงรัศมี (GeoJSON source) ที่ต้องรอ ถ้ารอทั้งฟังก์ชันจะเจอกรณี
+   * isStyleLoaded() ยังเป็น false ตอนเรียกครั้งแรก แล้วหมุดไม่ขึ้นเลยจนกว่าจะมีอะไรเปลี่ยน
+   */
   function refreshHazards() {
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
 
     const reports = window.Store.visibleReports();
     const selectedId = window.Store.state.selectedId;
@@ -281,8 +342,69 @@ window.MapView = (function () {
         geometry: U.circlePolygon([r.lng, r.lat], r.radius),
       })),
     };
-    const src = map.getSource('hazard-zones');
+    const src = map.isStyleLoaded() && map.getSource('hazard-zones');
     if (src) src.setData(zones);
+
+    updateMarkerView();
+  }
+
+  /**
+   * ซ่อนหมุดที่ไม่ได้อยู่ในกรอบแผนที่ และปรับขนาดตามระดับซูม
+   *
+   * บนแผนที่เอียง จุดที่อยู่ "หลังกล้อง" จะถูกฉายกลับเข้ามาในจอ
+   * ทำให้หมุดที่อยู่ไกลหลายสิบกิโลเมตรโผล่ลอยอยู่กลางจอและดูเหมือนเลื่อนตามผู้ใช้
+   */
+  function updateMarkerView() {
+    if (!map || !markers.size) return;
+
+    const zoom = map.getZoom();
+    const canvas = map.getCanvas();
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    const margin = 130; // เผื่อขอบ ไม่ให้หมุดโผล่/หายกะทันหันตอนลากแผนที่
+
+    const c = map.getCenter();
+    const center = [c.lng, c.lat];
+    // เมตรต่อพิกเซลคร่าว ๆ → ประเมินว่าจอครอบคลุมพื้นที่กว้างแค่ไหน
+    const mpp = (156543.03392 * Math.cos((c.lat * Math.PI) / 180)) / 2 ** zoom;
+    // จำกัดเพดานไว้ ไม่ให้ตอนซูมออกสุดกลายเป็นไม่ตัดอะไรเลย
+    const maxDistance = Math.min(mpp * Math.max(w, h) * 2, 200000);
+
+    // ซูมเข้า = หมุดใหญ่ขึ้น อ่านง่ายขึ้น / ซูมออก = เล็กลงมาก ไม่ให้ทับกันจนรก
+    const scale = Math.max(0.55, Math.min(1.45, 0.55 + (zoom - 10) * 0.13));
+
+    const centerPt = map.project(center);
+    const bearing = map.getBearing();
+
+    for (const marker of markers.values()) {
+      const node = marker.getElement();
+      const ll = marker.getLngLat();
+      const coord = [ll.lng, ll.lat];
+      const pt = map.project(ll);
+
+      // อยู่ในกรอบจอไหม (เผื่อขอบไว้กันหมุดกระพริบตอนลาก)
+      const inFrame =
+        pt.x >= -margin && pt.x <= w + margin && pt.y >= -margin && pt.y <= h + margin;
+
+      const inRange = U.distance(center, coord) < maxDistance;
+
+      /*
+       * จุดที่อยู่เลยเส้นขอบฟ้าจะถูกฉายกลับด้านเข้ามาในจอ กลายเป็นหมุดเรียงกลางจอ
+       * ตรวจโดยเทียบ "ทิศจริงบนพื้นโลก" กับ "ทิศบนจอ" ถ้าชี้กลับทางแปลว่าถูกฉายกลับ
+       * (ใช้ทิศแทนการแปลงพิกัดกลับ เพราะ terrain ทำให้การแปลงกลับคลาดเคลื่อน)
+       */
+      const vx = pt.x - centerPt.x;
+      const vy = pt.y - centerPt.y;
+      const len = Math.hypot(vx, vy);
+      let inFront = true;
+      if (len > 1) {
+        const rad = ((U.bearing(center, coord) - bearing) * Math.PI) / 180;
+        inFront = (vx * Math.sin(rad) + vy * -Math.cos(rad)) / len > 0;
+      }
+
+      node.classList.toggle('is-offscreen', !(inFrame && inRange && inFront));
+      node.style.setProperty('--marker-scale', scale.toFixed(2));
+    }
   }
 
   function buildMarkerElement(report) {
@@ -293,15 +415,45 @@ window.MapView = (function () {
 
     const pin = U.el('div', 'hazard-marker__pin');
     pin.appendChild(U.el('span', 'hazard-marker__icon', def.icon));
-    const stem = U.el('div', 'hazard-marker__stem');
     const shadow = U.el('div', 'hazard-marker__shadow');
 
-    wrap.append(pin, stem, shadow);
+    // ป้ายทรงใหม่มีหางในตัวแล้ว ไม่ต้องมีก้าน (เหลือจากหมุดทรงหยดน้ำเดิม)
+    wrap.append(pin, shadow);
     wrap.addEventListener('click', (e) => {
       e.stopPropagation();
       onMarkerClick(report.id);
     });
     return wrap;
+  }
+
+  /**
+   * ขยับกล้องให้เห็นหมุดภัยทั้งหมดที่ผ่านตัวกรอง
+   * ใช้ตอนเปิดแอป เพราะมุมกล้อง 3 มิติเริ่มต้นแคบจนหมุดมักหลุดออกนอกจอ
+   */
+  function fitToHazards({ duration = 0 } = {}) {
+    if (!map) return false;
+    const reports = window.Store.visibleReports();
+    if (!reports.length) return false;
+
+    const lngs = reports.map((r) => r.lng);
+    const lats = reports.map((r) => r.lat);
+    const camera = map.cameraForBounds(
+      [
+        [Math.min(...lngs), Math.min(...lats)],
+        [Math.max(...lngs), Math.max(...lats)],
+      ],
+      // เผื่อที่ให้แถบบน ป้ายความเสี่ยง และปุ่มลอยด้านล่าง
+      { padding: { top: 150, bottom: 130, left: 45, right: 45 } }
+    );
+    if (!camera) return false;
+
+    // รายงานอาจกระจายทั้งเมือง ถ้าย่อจนพอดีทุกจุดหมุดจะเล็กและอาคาร 3 มิติหาย
+    // จึงตรึงระดับซูมไว้ในช่วงที่ยังเห็นหมุดชัดและยังเป็นมุมมองสามมิติ
+    const zoom = Math.max(14, Math.min(15.2, camera.zoom));
+    // ตั้งต้นหันทิศเหนือ เข็มทิศจะซ่อนไว้จนกว่าผู้ใช้จะหมุนแผนที่เอง
+    map.easeTo({ center: camera.center, zoom, pitch: 55, bearing: 0, duration });
+    updateCompass();
+    return true;
   }
 
   /* ---------- วงคลื่นเตือน (แอนิเมชัน) ---------- */
@@ -314,9 +466,12 @@ window.MapView = (function () {
       const src = map.getSource('pulse-ring');
       if (!src) return;
 
-      const targets = window.Store
-        .visibleReports()
-        .filter((r) => r.severity === 'high' || r.id === window.Store.state.selectedId);
+      // ซูมออกมากแล้ว คลื่นกระเพื่อมจะกลายเป็นจุดรก ๆ เต็มจอ จึงหยุดวาด
+      const targets = map.getZoom() < ZONE_MIN_ZOOM
+        ? []
+        : window.Store
+          .visibleReports()
+          .filter((r) => r.severity === 'high' || r.id === window.Store.state.selectedId);
 
       if (!targets.length) {
         src.setData({ type: 'FeatureCollection', features: [] });
@@ -405,10 +560,16 @@ window.MapView = (function () {
   }
 
   function updateCompass() {
+    const bearing = map.getBearing();
     const needle = document.getElementById('compassNeedle');
-    if (needle) needle.style.transform = `rotate(${-map.getBearing()}deg)`;
+    if (needle) needle.style.transform = `rotate(${-bearing}deg)`;
+
     const btn = document.getElementById('btn3D');
     if (btn) btn.classList.toggle('is-active', map.getPitch() > 20);
+
+    // หันเหนืออยู่แล้วก็ไม่ต้องมีปุ่ม "หันไปทิศเหนือ" ให้รก
+    const compass = document.getElementById('btnCompass');
+    if (compass) compass.classList.toggle('is-hidden', Math.abs(bearing) < 1);
   }
 
   /* ---------- โหมดสไตล์ ---------- */
@@ -453,6 +614,7 @@ window.MapView = (function () {
     init,
     onReady,
     refreshHazards,
+    fitToHazards,
     flyToReport,
     setUserPuck,
     followUser,

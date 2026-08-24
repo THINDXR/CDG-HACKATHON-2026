@@ -22,11 +22,16 @@
       window.Store.select(id);
       const r = window.Store.state.reports.find((x) => x.id === id);
       if (r) window.MapView.flyToReport(r, { zoom: Math.max(window.MapView.instance.getZoom(), 16.5) });
+      // กดหมุดบนแผนที่ก็ให้แผ่นเปิดมาแสดงรายละเอียดเช่นเดียวกับกดจากรายการ
+      window.UI.showDetailSheet();
     };
 
     window.MapView.onReady(() => {
       window.MapView.refreshHazards();
-      window.UI.toast('ลากด้วยสองนิ้ว (หรือกดขวาแล้วลาก) เพื่อหมุนและเอียงแผนที่');
+      // เปิดมาให้เห็นหมุดภัยทันที ไม่ต้องเลื่อนหาเอง
+      window.MapView.fitToHazards();
+      window.UI.renderList();
+      locateOnStart();
     });
 
     // อัปเดตเวลา "กี่นาทีที่แล้ว" และล้างรายงานหมดอายุ
@@ -36,11 +41,54 @@
     }, 60 * 1000);
   }
 
+  /* ---------- หาตำแหน่งตอนเปิดแอป ---------- */
+
+  // ไกลกว่านี้ถือว่าข้อมูลตัวอย่างไม่เกี่ยวกับผู้ใช้เลย (เมตร)
+  const FAR_FROM_DATA = 50000;
+
+  /**
+   * ขอตำแหน่งครั้งเดียวตอนเปิด เพื่อให้แผนที่เริ่มที่ "รอบตัวคุณ"
+   * ไม่ใช่พิกัดตายตัว ถ้าผู้ใช้ปฏิเสธก็ยังใช้มุมกล้องจากข้อมูลภัยตามเดิม
+   */
+  function locateOnStart() {
+    if (!navigator.geolocation) {
+      window.UI.toast('เบราว์เซอร์นี้ไม่รองรับการหาตำแหน่ง — เลื่อนแผนที่เองได้');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coord = [pos.coords.longitude, pos.coords.latitude];
+        window.Store.setUserPosition(coord, pos.coords.heading);
+        window.MapView.setUserPuck(coord, pos.coords.heading);
+        window.MapView.followUser(coord, pos.coords.heading);
+        warnIfFarFromData(coord);
+      },
+      () => {
+        window.UI.toast('ยังไม่ได้เปิดตำแหน่ง — แตะปุ่ม 📍 เพื่อดูภัยรอบตัวคุณ');
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+    );
+  }
+
+  /** ข้อมูลตัวอย่างอยู่ในกรุงเทพฯ ถ้าผู้ใช้อยู่ไกลจะไม่เห็นอะไรเลย จึงบอกให้ชัด */
+  function warnIfFarFromData(coord) {
+    const reports = window.Store.state.reports;
+    if (!reports.length) return;
+    const nearest = Math.min(
+      ...reports.map((r) => U.distance(coord, [r.lng, r.lat]))
+    );
+    if (nearest > FAR_FROM_DATA) {
+      window.UI.toast('ยังไม่มีรายงานใกล้คุณ — กด “แจ้งเหตุ” เพื่อเพิ่มจุดแรก', 'warn');
+    }
+  }
+
   /* ---------- เชื่อม Store กับหน้าจอ ---------- */
 
   function wireStore() {
     window.Store.subscribe((state, reason) => {
       if (reason === 'filter') window.UI.syncFilters();
+      if (reason === 'load' || reason === 'reset') window.UI.syncFilters();
 
       if (reason !== 'position') {
         window.MapView.refreshHazards();
@@ -74,6 +122,13 @@
     $('#btnTrack').addEventListener('click', () => {
       window.Alerts.ensureAudio();
       if (window.Alerts.isTracking) {
+        const pos = window.Store.state.userPosition;
+        // กำลังติดตามแต่เลื่อนแผนที่ออกไปแล้ว — แตะครั้งแรกให้กลับมาที่ตัวเอง
+        if (pos && !window.Store.state.following) {
+          window.Store.setFollowing(true);
+          window.MapView.followUser(pos, window.Store.state.userHeading);
+          return;
+        }
         window.Alerts.stopTracking();
         window.Store.setFollowing(false);
         window.UI.syncStatusButtons();
@@ -89,7 +144,7 @@
       window.UI.toast('กำลังขอตำแหน่งจากอุปกรณ์…');
     });
 
-    $('#btnSim').addEventListener('click', () => {
+    $('#setSim').addEventListener('change', () => {
       window.Alerts.ensureAudio();
       const running = window.Alerts.toggleSimulation();
       window.Store.setFollowing(running);
@@ -111,16 +166,6 @@
       window.MapView.setStyleMode(next);
       e.currentTarget.classList.toggle('is-active', next === 'satellite');
       window.UI.toast(next === 'satellite' ? 'มุมมองดาวเทียม' : 'มุมมองแผนที่ 3 มิติ');
-    });
-
-    $('#btnLocate').addEventListener('click', () => {
-      const pos = window.Store.state.userPosition;
-      if (!pos) {
-        window.UI.toast('ยังไม่ทราบตำแหน่ง — กด “เริ่มติดตามตำแหน่ง” ก่อน', 'warn');
-        return;
-      }
-      window.Store.setFollowing(true);
-      window.MapView.followUser(pos, window.Store.state.userHeading);
     });
   }
 
