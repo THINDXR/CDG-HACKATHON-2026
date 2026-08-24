@@ -1,0 +1,40 @@
+# เผยแพร่เว็บสแตติกขึ้น GitHub Pages ทุกครั้งที่ push ขึ้น main
+# ต้องเสิร์ฟผ่าน HTTPS อยู่แล้ว เพราะเบราว์เซอร์ไม่ให้ใช้ Geolocation บน HTTP
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# ปล่อยให้ deploy ทีละงาน แต่ไม่ยกเลิกงานที่กำลังเผยแพร่อยู่
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # enablement: true สั่งเปิด Pages ให้เอง จะได้ไม่ต้องไปกดตั้งค่าในหน้าเว็บ
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # ทั้งโปรเจกต์เป็นไฟล์สแตติกอยู่แล้ว อัปโหลดทั้ง root ได้เลย ไม่ต้อง build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
