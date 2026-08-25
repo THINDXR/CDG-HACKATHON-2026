@@ -288,15 +288,38 @@ button:active { transform: scale(0.96); }
 .search-result {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 6px;
   width: 100%;
-  padding: 10px 10px;
-  border: 0;
   border-radius: var(--radius-sm);
-  background: none;
-  text-align: left;
 }
 .search-result:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
+
+.search-result__main {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px;
+  border: 0;
+  background: none;
+  text-align: left;
+  border-radius: var(--radius-sm);
+}
+
+.search-result__go {
+  flex: none;
+  height: 32px;
+  margin-right: 8px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .search-result__pin { font-size: 16px; flex: none; }
 .search-result__text { min-width: 0; flex: 1; }
 .search-result__name {
@@ -368,6 +391,131 @@ button:active { transform: scale(0.96); }
   background: var(--accent);
   border-color: transparent;
   color: #fff;
+}
+
+/* ---------------- โหมดนำทาง (แนว Waze) ---------------- */
+
+.nav-card {
+  position: absolute;
+  top: max(12px, calc(var(--safe-t) + 8px));
+  left: max(12px, var(--safe-l));
+  right: max(12px, var(--safe-r));
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #6d28d9, #4c1d95);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  animation: navIn 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes navIn {
+  from { opacity: 0; transform: translateY(-14px); }
+}
+
+.nav-card__arrow {
+  width: 52px;
+  height: 52px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 27px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.nav-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: #fff;
+}
+.nav-card__body strong { font-size: 25px; letter-spacing: -0.4px; line-height: 1.1; }
+.nav-card__body span {
+  font-size: 13.5px;
+  opacity: 0.92;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-bar {
+  position: absolute;
+  left: max(10px, var(--safe-l));
+  right: max(10px, var(--safe-r));
+  bottom: max(12px, calc(var(--safe-b) + 8px));
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 12px 12px 16px;
+  border-radius: 22px;
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  animation: navBarIn 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes navBarIn {
+  from { opacity: 0; transform: translateY(16px); }
+}
+
+.nav-bar__stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.nav-bar__stat strong { font-size: 16px; letter-spacing: -0.2px; }
+.nav-bar__stat span { font-size: 10.5px; color: var(--text-dim); }
+
+.nav-bar__stop {
+  flex: none;
+  height: 42px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 21px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* ขณะนำทาง ซ่อนทุกอย่างที่ไม่เกี่ยวเพื่อให้เหลือแค่ถนนข้างหน้า */
+.phone.is-navigating .topbar,
+.phone.is-navigating .searchbar,
+.phone.is-navigating .quickfilters,
+.phone.is-navigating .sidebar,
+.phone.is-navigating .risk-chip,
+.phone.is-navigating .fab {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.phone.is-navigating .map-controls {
+  top: auto;
+  bottom: calc(var(--safe-b) + 84px);
+}
+
+/* หมุดปลายทาง */
+.dest-marker {
+  width: 34px;
+  height: 40px;
+  display: grid;
+  place-items: start center;
+}
+.dest-marker__pin {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
 }
 
 /* ---------------- แถบแจ้งเตือนใหญ่ ---------------- */
@@ -881,7 +1029,14 @@ button:active { transform: scale(0.96); }
 .detail-card__stats span { font-size: 11px; color: var(--text-dim); }
 .detail-card__stats strong { font-size: 14px; }
 
-.detail-card__actions { display: flex; gap: 8px; margin-top: 14px; }
+.detail-card__nav {
+  width: 100%;
+  margin-top: 14px;
+  padding: 13px;
+  font-size: 15px;
+}
+
+.detail-card__actions { display: flex; gap: 8px; margin-top: 10px; }
 
 /* ---------------- แผ่นซ้อน (ฟอร์ม/ตั้งค่า) ---------------- */
 
@@ -937,31 +1092,44 @@ button:active { transform: scale(0.96); }
   margin: 14px 0 7px;
 }
 
+/* ปุ่มแจ้งเหตุแบบวงกลมสี เรียงเป็นตาราง 3 ช่อง (แนว Waze) */
 .type-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px 8px;
 }
 
 .type-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 10px 6px;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--border);
-  background: transparent;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: none;
   font-size: 11.5px;
   text-align: center;
   line-height: 1.25;
-  transition: all 0.15s ease;
+  color: var(--text-dim);
 }
-.type-card__icon { font-size: 20px; }
-.type-card.is-active {
-  border-color: var(--type-color);
-  background: color-mix(in srgb, var(--type-color) 14%, transparent);
-  font-weight: 600;
+.type-card__icon {
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  font-size: 27px;
+  border-radius: 50%;
+  background: linear-gradient(150deg,
+    color-mix(in srgb, var(--type-color) 78%, white),
+    var(--type-color));
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--type-color) 40%, transparent);
+  border: 2px solid transparent;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.type-card.is-active { color: var(--text); font-weight: 700; }
+.type-card.is-active .type-card__icon {
+  border-color: #fff;
+  transform: scale(1.06);
 }
 
 .segmented {
@@ -1431,8 +1599,8 @@ body.picking .phone > #map::after {
   .brand__text strong { font-size: 15px; }
   .topbar__status { gap: 6px; }
 
-  .type-grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
-  .type-card { padding: 9px 4px; font-size: 11px; }
+  .type-card { font-size: 11px; }
+  .type-card__icon { width: 58px; height: 58px; font-size: 25px; }
 
   .alert-banner { width: calc(100cqw - max(24px, calc(var(--safe-l) + var(--safe-r) + 16px))); }
   .fab__label { font-size: 14px; }

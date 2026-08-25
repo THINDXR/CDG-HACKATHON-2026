@@ -220,6 +220,7 @@ window.UI = (function () {
         <div><span>รัศมีเตือน</span><strong>${report.radius} ม.</strong></div>
         <div><span>รายงานเมื่อ</span><strong>${U.formatAgo(report.createdAt)}</strong></div>
       </div>
+      <button class="primary-btn detail-card__nav" data-act="navigate">🧭 นำทางไปจุดนี้</button>
       <div class="detail-card__actions">
         <button class="ghost-btn" data-act="up">👍 ยังอยู่ (${report.confirms})</button>
         <button class="ghost-btn" data-act="down">👎 หายแล้ว (${report.denies})</button>
@@ -232,11 +233,78 @@ window.UI = (function () {
         if (act === 'delete') {
           window.Store.removeReport(report.id);
           toast('ลบรายงานแล้ว');
+        } else if (act === 'navigate') {
+          startNavigation(
+            { lng: report.lng, lat: report.lat, label: report.road || CFG.HAZARD_TYPES[report.type].label }
+          );
         } else {
           window.Store.vote(report.id, act === 'up' ? 'up' : 'down');
         }
       });
     });
+  }
+
+  /* ---------- โหมดนำทาง ---------- */
+
+  /** เริ่มนำทางจากตำแหน่งปัจจุบัน (หรือกลางจอถ้ายังไม่เปิด GPS) ไปยังจุดหมาย */
+  async function startNavigation(dest) {
+    const from = origin();
+    if (!from) {
+      toast('ยังไม่ทราบตำแหน่งเริ่มต้น', 'warn');
+      return;
+    }
+
+    window.Alerts.ensureAudio();
+    toast('กำลังคำนวณเส้นทาง…');
+
+    try {
+      const route = await window.Navigate.start(from, dest);
+      $('#phone').classList.add('is-navigating');
+      setDetent('closed');
+      window.MapView.setNavRoute(route.coordinates);
+      window.MapView.fitRoute(route.coordinates);
+      renderNav();
+
+      if (!window.Store.state.userPosition) {
+        toast('เปิดติดตามตำแหน่งหรือโหมดจำลองการขับ เพื่อให้นำทางเดินหน้าได้', 'warn');
+      }
+    } catch (err) {
+      toast(err.message || 'หาเส้นทางไม่สำเร็จ', 'warn');
+    }
+  }
+
+  function stopNavigation() {
+    window.Navigate.stop();
+    $('#phone').classList.remove('is-navigating');
+    window.MapView.setNavRoute(null);
+    renderNav();
+    setDetent('peek');
+  }
+
+  /** วาดการ์ดนำทางและแถบสรุปด้านล่างจากความคืบหน้าล่าสุด */
+  function renderNav() {
+    const active = window.Navigate.isActive;
+    $('#navCard').hidden = !active;
+    $('#navBar').hidden = !active;
+    if (!active) return;
+
+    const p = window.Navigate.progress;
+    if (!p) return;
+
+    $('#navArrow').textContent = p.step?.arrow || '⬆';
+    $('#navDistance').textContent = U.formatDistance(p.distanceToManeuver);
+    $('#navInstruction').textContent = p.step?.instruction || 'ตรงไป';
+
+    $('#navRemaining').textContent = U.formatDistance(p.remaining);
+    $('#navDuration').textContent = formatDuration(p.remainingSeconds);
+    $('#navEta').textContent = new Date(Date.now() + p.remainingSeconds * 1000)
+      .toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function formatDuration(seconds) {
+    const mins = Math.max(1, Math.round(seconds / 60));
+    if (mins < 60) return `${mins} นาที`;
+    return `${Math.floor(mins / 60)} ชม. ${mins % 60} น.`;
   }
 
   /* ---------- แถบแจ้งเตือน + toast ---------- */
@@ -418,17 +486,27 @@ window.UI = (function () {
     }
 
     for (const place of places) {
-      const btn = el('button', 'search-result');
-      btn.type = 'button';
-      btn.setAttribute('role', 'option');
-      btn.innerHTML = `
-        <span class="search-result__pin" aria-hidden="true">📍</span>
-        <span class="search-result__text">
-          <span class="search-result__name">${escapeHtml(place.name)}</span>
-          ${place.detail ? `<span class="search-result__detail">${escapeHtml(place.detail)}</span>` : ''}
-        </span>`;
-      btn.addEventListener('click', () => goToPlace(place));
-      box.appendChild(btn);
+      const row = el('div', 'search-result');
+      row.setAttribute('role', 'option');
+      row.innerHTML = `
+        <button class="search-result__main" type="button">
+          <span class="search-result__pin" aria-hidden="true">📍</span>
+          <span class="search-result__text">
+            <span class="search-result__name">${escapeHtml(place.name)}</span>
+            ${place.detail ? `<span class="search-result__detail">${escapeHtml(place.detail)}</span>` : ''}
+          </span>
+        </button>
+        <button class="search-result__go" type="button" title="นำทางไปที่นี่">นำทาง</button>`;
+
+      row.querySelector('.search-result__main').addEventListener('click', () => goToPlace(place));
+      row.querySelector('.search-result__go').addEventListener('click', () => {
+        $('#searchInput').value = '';
+        window.Store.setSearch('');
+        hideSearchResults();
+        $('#searchInput').blur();
+        startNavigation({ lng: place.lng, lat: place.lat, label: place.name });
+      });
+      box.appendChild(row);
     }
     box.hidden = false;
   }
@@ -684,6 +762,10 @@ window.UI = (function () {
     });
 
     $('#alertClose').addEventListener('click', hideAlert);
+    $('#btnStopNav').addEventListener('click', () => {
+      stopNavigation();
+      toast('จบการนำทางแล้ว');
+    });
     $('#riskChip').addEventListener('click', () => setDetent('half'));
     bindSheetDrag();
     setDetent('peek');
@@ -702,6 +784,9 @@ window.UI = (function () {
     renderList,
     renderRisk,
     renderDetail,
+    renderNav,
+    startNavigation,
+    stopNavigation,
     showDetailSheet: collapseToMap,
     renderFilters,
     renderFilterSheet,

@@ -17,6 +17,7 @@
     wireStore();
     wireAlerts();
     wireMapControls();
+    wireNavigation();
 
     window.MapView.onMarkerClick = (id) => {
       window.Store.select(id);
@@ -85,6 +86,19 @@
 
   /* ---------- เชื่อม Store กับหน้าจอ ---------- */
 
+  function wireNavigation() {
+    window.Navigate.onChange = () => {
+      window.UI.renderNav();
+      const route = window.Navigate.route;
+      window.MapView.setNavRoute(route ? route.coordinates : null);
+    };
+
+    window.Navigate.onFinish = (dest) => {
+      window.UI.stopNavigation();
+      window.UI.toast(`ถึง${dest?.label || 'จุดหมาย'}แล้ว 🏁`, 'success');
+    };
+  }
+
   function wireStore() {
     window.Store.subscribe((state, reason) => {
       if (reason === 'filter') window.UI.syncFilters();
@@ -98,7 +112,15 @@
 
       if (reason === 'position') {
         window.MapView.setUserPuck(state.userPosition, state.userHeading);
-        if (state.following) window.MapView.followUser(state.userPosition, state.userHeading);
+
+        if (window.Navigate.isActive) {
+          // ขณะนำทาง กล้องเกาะรถและหันตามทิศเสมอ ไม่ต้องรอโหมดตามตำแหน่ง
+          window.Navigate.update(state.userPosition);
+          window.MapView.navCamera(state.userPosition, state.userHeading);
+        } else if (state.following) {
+          window.MapView.followUser(state.userPosition, state.userHeading);
+        }
+
         window.Alerts.check(state.userPosition, state.userHeading);
         if (Date.now() - lastListRender > LIST_RENDER_MS) {
           lastListRender = Date.now();

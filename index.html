@@ -52,6 +52,31 @@
   <!-- ชิปกรองประเภทภัย -->
   <div class="quickfilters" id="quickFilters" role="group" aria-label="กรองประเภทภัย"></div>
 
+  <!-- การ์ดนำทาง (แสดงเฉพาะตอนนำทางอยู่) -->
+  <div id="navCard" class="nav-card" hidden aria-live="polite">
+    <div class="nav-card__arrow" id="navArrow">⬆</div>
+    <div class="nav-card__body">
+      <strong id="navDistance">—</strong>
+      <span id="navInstruction">กำลังคำนวณเส้นทาง…</span>
+    </div>
+  </div>
+
+  <div id="navBar" class="nav-bar" hidden>
+    <div class="nav-bar__stat">
+      <strong id="navEta">—</strong>
+      <span>ถึงเวลา</span>
+    </div>
+    <div class="nav-bar__stat">
+      <strong id="navRemaining">—</strong>
+      <span>ระยะเหลือ</span>
+    </div>
+    <div class="nav-bar__stat">
+      <strong id="navDuration">—</strong>
+      <span>เวลาเหลือ</span>
+    </div>
+    <button id="btnStopNav" class="nav-bar__stop" type="button">จบ</button>
+  </div>
+
   <!-- แถบแจ้งเตือนใหญ่ -->
   <div id="alertBanner" class="alert-banner" role="alert" aria-live="assertive" hidden>
     <div class="alert-banner__icon" id="alertIcon">⚠️</div>
@@ -208,9 +233,11 @@
   <script src="js/config.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/geocode.js"></script>
+  <script src="js/route.js"></script>
   <script src="js/store.js"></script>
   <script src="js/map.js"></script>
   <script src="js/alerts.js"></script>
+  <script src="js/navigate.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/app.js"></script>
 </body>

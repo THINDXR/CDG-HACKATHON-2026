@@ -9,6 +9,7 @@ window.MapView = (function () {
   let styleMode = 'vector';
   let markers = new Map(); // id -> maplibregl.Marker
   let userMarker = null;
+  let destMarker = null;
   let pulseFrame = null;
   let onMarkerClick = () => {};
   let onMapClick = () => {};
@@ -287,6 +288,99 @@ window.MapView = (function () {
         },
       });
     }
+
+    addNavRouteLayers();
+  }
+
+  /* ---------- เส้นทางนำทาง ---------- */
+
+  /** เส้นทางแบบ Waze: เส้นขอบเข้มด้านล่าง ทับด้วยเส้นม่วงสว่างด้านบน */
+  function addNavRouteLayers() {
+    if (!map.getSource('nav-route')) {
+      map.addSource('nav-route', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+    }
+    if (!map.getLayer('nav-route-casing')) {
+      map.addLayer({
+        id: 'nav-route-casing',
+        type: 'line',
+        source: 'nav-route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#2a1a55',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 20, 18, 30],
+          'line-opacity': 0.9,
+        },
+      });
+    }
+    if (!map.getLayer('nav-route-line')) {
+      map.addLayer({
+        id: 'nav-route-line',
+        type: 'line',
+        source: 'nav-route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#8b5cf6',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 5, 16, 14, 18, 22],
+        },
+      });
+    }
+  }
+
+  /** วาด/ลบเส้นทางนำทาง — ส่ง null เพื่อล้าง */
+  function setNavRoute(coordinates) {
+    if (!map) return;
+    addNavRouteLayers();
+    const src = map.getSource('nav-route');
+    if (!src) return;
+
+    src.setData(
+      coordinates && coordinates.length
+        ? { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } }
+        : { type: 'FeatureCollection', features: [] }
+    );
+
+    if (destMarker) {
+      destMarker.remove();
+      destMarker = null;
+    }
+    if (coordinates && coordinates.length) {
+      const node = U.el('div', 'dest-marker');
+      node.appendChild(U.el('span', 'dest-marker__pin', '🏁'));
+      destMarker = new maplibregl.Marker({ element: node, anchor: 'bottom' })
+        .setLngLat(coordinates[coordinates.length - 1])
+        .addTo(map);
+    }
+  }
+
+  /** ปรับกล้องให้เห็นเส้นทางทั้งเส้น ใช้ตอนเริ่มนำทาง */
+  function fitRoute(coordinates) {
+    if (!map || !coordinates?.length) return;
+    const lngs = coordinates.map((c) => c[0]);
+    const lats = coordinates.map((c) => c[1]);
+    map.fitBounds(
+      [
+        [Math.min(...lngs), Math.min(...lats)],
+        [Math.max(...lngs), Math.max(...lats)],
+      ],
+      { padding: { top: 170, bottom: 210, left: 50, right: 50 }, maxZoom: 16, duration: 900 }
+    );
+  }
+
+  /** มุมกล้องแบบนำทาง: ซูมใกล้ เอียงมาก และหันไปตามทิศที่รถวิ่ง */
+  function navCamera(coord, heading) {
+    if (!map || !coord) return;
+    map.easeTo({
+      center: coord,
+      zoom: 17,
+      pitch: 60,
+      bearing: typeof heading === 'number' ? heading : map.getBearing(),
+      duration: 700,
+      // เลื่อนจุดศูนย์กลางลงล่าง ให้เห็นถนนข้างหน้ามากกว่าข้างหลัง
+      padding: { top: 240, bottom: 0, left: 0, right: 0 },
+    });
   }
 
   /**
@@ -616,6 +710,9 @@ window.MapView = (function () {
     refreshHazards,
     fitToHazards,
     flyToReport,
+    setNavRoute,
+    fitRoute,
+    navCamera,
     setUserPuck,
     followUser,
     toggle3D,
