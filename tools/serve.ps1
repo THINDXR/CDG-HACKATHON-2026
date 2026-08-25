@@ -30,6 +30,13 @@ while ($listener.IsListening) {
             $contentType = $mime[$ext]
             if (-not $contentType) { $contentType = "application/octet-stream" }
             $bytes = [System.IO.File]::ReadAllBytes($filePath)
+
+            # ตัวเสิร์ฟนี้ใช้ตอนพัฒนาเท่านั้น ถ้าไม่สั่งห้ามแคช
+            # เบราว์เซอร์จะเก็บ CSS/JS เดิมไว้ แก้โค้ดแล้วหน้าจอเหมือนไม่มีอะไรเปลี่ยน
+            $response.Headers.Add("Cache-Control", "no-store, no-cache, must-revalidate")
+            $response.Headers.Add("Pragma", "no-cache")
+            $response.Headers.Add("Expires", "0")
+
             $response.ContentType = $contentType
             $response.ContentLength64 = $bytes.Length
             $response.OutputStream.Write($bytes, 0, $bytes.Length)
