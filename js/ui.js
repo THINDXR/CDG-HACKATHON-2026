@@ -50,7 +50,7 @@ window.UI = (function () {
       row.innerHTML = `
         <span class="filter-row__icon">${def.icon}</span>
         <span class="filter-row__label">${escapeHtml(def.label)}</span>
-        <span class="filter-row__check">✓</span>`;
+        <span class="filter-row__check">${window.Icons.get("check")}</span>`;
       row.addEventListener('click', () => window.Store.toggleType(key));
       box.appendChild(row);
     }
@@ -95,8 +95,8 @@ window.UI = (function () {
       const empty = el('li', 'empty-state');
       const searching = window.Store.state.search.trim();
       empty.innerHTML = searching
-        ? `<div>🔍</div><p>ไม่พบรายงานที่ตรงกับ “${escapeHtml(searching)}”<br />ลองคำอื่น หรือล้างช่องค้นหา</p>`
-        : `<div>🛣️</div><p>ยังไม่มีรายงานที่ตรงกับตัวกรอง<br />ลองเปิดตัวกรองเพิ่ม หรือกด “แจ้งเหตุ”</p>`;
+        ? `<div>${window.Icons.get('search')}</div><p>ไม่พบรายงานที่ตรงกับ “${escapeHtml(searching)}”<br />ลองคำอื่น หรือล้างช่องค้นหา</p>`
+        : `<div>${window.Icons.get('map')}</div><p>ยังไม่มีรายงานที่ตรงกับตัวกรอง<br />ลองเปิดตัวกรองเพิ่ม หรือกด “แจ้งเหตุ”</p>`;
       list.appendChild(empty);
     }
 
@@ -122,7 +122,7 @@ window.UI = (function () {
             <span>${item.confirms} รายงาน</span>
           </div>
         </div>
-        <span class="hazard-item__go" aria-hidden="true">›</span>`;
+        <span class="hazard-item__go" aria-hidden="true">${window.Icons.get("chevronRight")}</span>`;
 
       li.addEventListener('click', () => {
         window.Store.select(item.id);
@@ -214,10 +214,10 @@ window.UI = (function () {
         <div><span>รัศมีเตือน</span><strong>${report.radius} ม.</strong></div>
         <div><span>รายงานเมื่อ</span><strong>${U.formatAgo(report.createdAt)}</strong></div>
       </div>
-      <button class="primary-btn detail-card__nav" data-act="navigate">🧭 นำทางไปจุดนี้</button>
+      <button class="primary-btn detail-card__nav" data-act="navigate">${window.Icons.get("navigate")} นำทางไปจุดนี้</button>
       <div class="detail-card__actions">
-        <button class="ghost-btn" data-act="up">👍 ยังอยู่ (${report.confirms})</button>
-        <button class="ghost-btn" data-act="down">👎 หายแล้ว (${report.denies})</button>
+        <button class="ghost-btn" data-act="up">ยังอยู่ (${report.confirms})</button>
+        <button class="ghost-btn" data-act="down">หายแล้ว (${report.denies})</button>
         ${report.mine ? '<button class="ghost-btn danger" data-act="delete">ลบ</button>' : ''}
       </div>`;
 
@@ -254,6 +254,8 @@ window.UI = (function () {
     try {
       const route = await window.Navigate.start(from, dest);
       $('#phone').classList.add('is-navigating');
+      // เริ่มนำทาง = ล็อกกล้องไว้ที่ลูกศรก่อนเสมอ
+      window.Store.setFollowing(true);
       setDetent('closed');
       window.MapView.setNavRoute(route.coordinates);
       window.MapView.fitRoute(route.coordinates);
@@ -280,12 +282,14 @@ window.UI = (function () {
     const active = window.Navigate.isActive;
     $('#navCard').hidden = !active;
     $('#navBar').hidden = !active;
+    // ระหว่างนำทาง ถ้าผู้ใช้เลื่อนแผนที่เอง กล้องจะเลิกเกาะลูกศร จึงเสนอปุ่มให้กลับไปล็อก
+    $('#btnRecenter').hidden = !active || window.Store.state.following;
     if (!active) return;
 
     const p = window.Navigate.progress;
     if (!p) return;
 
-    $('#navArrow').textContent = p.step?.arrow || '⬆';
+    $('#navArrow').innerHTML = window.Icons.get(p.step?.arrow || 'straight');
     $('#navDistance').textContent = U.formatDistance(p.distanceToManeuver);
     $('#navInstruction').textContent = p.step?.instruction || 'ตรงไป';
 
@@ -516,25 +520,25 @@ window.UI = (function () {
 
     const factors = [
       {
-        icon: '🚧',
+        icon: 'construction',
         label: 'ความหนาแน่นของเหตุ',
         detail: `${risk.count} จุดในรัศมี ${risk.radius / 1000} กม.`,
         level: risk.count >= 8 ? 'high' : risk.count >= 4 ? 'medium' : 'low',
       },
       {
-        icon: '🚦',
+        icon: 'traffic',
         label: 'สภาพจราจร',
         detail: traffic ? `มีรายงานรถติด ${traffic} จุด` : 'ไม่มีรายงานรถติด',
         level: traffic >= 2 ? 'high' : traffic ? 'medium' : 'low',
       },
       {
-        icon: '🌊',
+        icon: 'flood',
         label: 'น้ำท่วมขัง',
         detail: flood ? `มีรายงานน้ำท่วม ${flood} จุด` : 'ไม่มีรายงานน้ำท่วม',
         level: flood >= 2 ? 'high' : flood ? 'medium' : 'low',
       },
       {
-        icon: '🕒',
+        icon: 'clock',
         label: 'ช่วงเวลา',
         detail: rush ? 'ชั่วโมงเร่งด่วน' : night ? 'กลางคืน ทัศนวิสัยลดลง' : 'นอกชั่วโมงเร่งด่วน',
         level: rush ? 'high' : night ? 'medium' : 'low',
@@ -552,7 +556,7 @@ window.UI = (function () {
         const l = LEVEL[f.level];
         return `
           <div class="factor">
-            <span class="factor__icon">${f.icon}</span>
+            <span class="factor__icon">${window.Icons.get(f.icon)}</span>
             <div class="factor__body">
               <div class="factor__top">
                 <strong>${escapeHtml(f.label)}</strong>
@@ -574,7 +578,7 @@ window.UI = (function () {
     list.innerHTML = '';
 
     if (!items.length) {
-      list.innerHTML = '<li class="empty-state"><div>🛣️</div><p>ยังไม่มีรายงานในขณะนี้</p></li>';
+      list.innerHTML = '<li class="empty-state">${window.Icons.get("map")}<p>ยังไม่มีรายงานในขณะนี้</p></li>';
       return;
     }
 
@@ -590,7 +594,7 @@ window.UI = (function () {
             <span class="event__ago">${U.formatAgo(item.createdAt)}</span>
           </div>
           <p class="event__text">${escapeHtml(item.note || item.road)}</p>
-          <span class="event__meta">👍 ยืนยัน ${item.confirms} · ${U.formatDistance(item.distance || 0)}</span>
+          <span class="event__meta">ยืนยัน ${item.confirms} · ${U.formatDistance(item.distance || 0)}</span>
         </div>`;
       li.addEventListener('click', () => {
         setView('map');
@@ -638,7 +642,7 @@ window.UI = (function () {
       row.setAttribute('role', 'option');
       row.innerHTML = `
         <button class="search-result__main" type="button">
-          <span class="search-result__pin" aria-hidden="true">📍</span>
+          <span class="search-result__pin" aria-hidden="true">${window.Icons.get("pin")}</span>
           <span class="search-result__text">
             <span class="search-result__name">${escapeHtml(place.name)}</span>
             ${place.detail ? `<span class="search-result__detail">${escapeHtml(place.detail)}</span>` : ''}
@@ -823,7 +827,7 @@ window.UI = (function () {
     $('#btnTrack').title = tracking ? 'กำลังติดตามตำแหน่ง' : 'ติดตามตำแหน่งของฉัน';
 
     const muted = !window.Alerts.settings.sound;
-    $('#btnMute').textContent = muted ? '🔕' : '🔔';
+    $('#btnMute').innerHTML = window.Icons.get(muted ? 'bellOff' : 'bell');
     $('#btnMute').title = muted ? 'เปิดเสียงเตือน' : 'ปิดเสียงเตือน';
   }
 
@@ -923,6 +927,13 @@ window.UI = (function () {
     $('#btnStopNav').addEventListener('click', () => {
       stopNavigation();
       toast('จบการนำทางแล้ว');
+    });
+
+    $('#btnRecenter').addEventListener('click', () => {
+      const s = window.Store.state;
+      window.Store.setFollowing(true);
+      if (s.userPosition) window.MapView.navCamera(s.userPosition, s.userHeading);
+      renderNav();
     });
     bindSheetDrag();
     setDetent('peek');

@@ -36,6 +36,13 @@
 * { box-sizing: border-box; }
 
 /*
+ * ไอคอน SVG ทุกตัวรับขนาดจาก font-size ของ element แม่ (width/height = 1em)
+ * และรับสีจาก color ผ่าน currentColor จึงใช้กฎเดิมที่เคยคุม emoji ได้เลย
+ */
+/* inline-block เพื่อให้ไอคอนที่แทรกกลางข้อความไม่ดันบรรทัดใหม่ */
+.icon { display: inline-block; vertical-align: -0.15em; flex: none; }
+
+/*
  * ต้องมาก่อนทุกกฎที่ตั้ง display เอง
  * `hidden` เป็นกฎจาก UA stylesheet (display:none) ซึ่งแพ้กฎของเราอย่าง
  * `.sheet-backdrop { display: grid }` ทำให้แผ่นซ้อนที่ควรถูกซ่อน
@@ -736,6 +743,29 @@ button:active { transform: scale(0.96); }
   top: auto;
   bottom: calc(var(--safe-b) + 84px);
 }
+
+/* ปุ่มกลับไปล็อกกล้องที่ลูกศร (แบบ Google Maps) */
+.recenter {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--safe-b) + 96px);
+  z-index: 46;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 21px;
+  background: var(--surface-solid);
+  color: var(--accent);
+  font-size: 13.5px;
+  font-weight: 700;
+  box-shadow: var(--shadow);
+  animation: navBarIn 0.24s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.recenter:active { transform: translateX(-50%) scale(0.96); }
 
 /* หมุดปลายทาง */
 .dest-marker {
@@ -1589,42 +1619,45 @@ button:active { transform: scale(0.96); }
 
 /* ---------------- จุดตำแหน่งผู้ใช้ ---------------- */
 
+/* MapLibre คุม transform ของชั้นนอก (ตำแหน่ง + การหมุนตามทิศ) ห้ามแตะ */
 .user-puck {
   position: relative;
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
 }
-.user-puck__dot {
-  position: absolute;
-  inset: 4px;
-  border-radius: 50%;
-  background: #0a84ff;
-  border: 2.5px solid #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+
+/* ชั้นในไว้ย่อ-ขยายตามระดับซูม โดยไม่ไปชนกับ transform ของ MapLibre */
+.user-puck__inner {
+  position: relative;
+  display: grid;
+  place-items: center;
+  transform: scale(var(--puck-scale, 1));
+  transition: transform 0.2s ease;
 }
+
+/* หัวลูกศรชี้ทิศที่กำลังมุ่งหน้า */
+.user-puck__arrow {
+  position: relative;
+  fill: #0a84ff;
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
+}
+
 .user-puck__halo {
   position: absolute;
-  inset: -14px;
+  inset: -12px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(10, 132, 255, 0.28), transparent 70%);
+  background: radial-gradient(circle, rgba(10, 132, 255, 0.3), transparent 70%);
   animation: haloPulse 2.4s ease-in-out infinite;
 }
 @keyframes haloPulse {
   0%, 100% { opacity: 0.5; scale: 0.85; }
   50% { opacity: 1; scale: 1.15; }
 }
-.user-puck__cone {
-  position: absolute;
-  left: 50%;
-  bottom: 50%;
-  width: 46px;
-  height: 46px;
-  transform: translateX(-50%);
-  background: conic-gradient(from -25deg, rgba(10, 132, 255, 0.45), transparent 50deg);
-  clip-path: polygon(50% 100%, 0 0, 100% 0);
-  opacity: 0;
-}
-.user-puck.has-heading .user-puck__cone { opacity: 1; }
 
 /* ---------------- โหมดเลือกจุด ---------------- */
 
@@ -1837,3 +1870,31 @@ body.picking .phone > #map::after {
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ---------------- สีของไอคอนตามบริบท ---------------- */
+
+/* ไอคอนบนพื้นสีเข้ม/สีสด ใช้สีขาวเพื่อให้ตัดกับพื้นหลัง */
+.hazard-marker__pin,
+.type-card__icon,
+.brand__mark,
+.event__icon,
+.hazard-item__icon,
+.detail-card__icon,
+.filter-row__icon { color: #fff; }
+
+/*
+ * ไอคอนที่วางบนพื้นสีอ่อน ๆ ของประเภทตัวเอง ต้องผสมขาวเข้าไปด้วย
+ * ไม่งั้นสีเข้ม (เช่น แดงของอุบัติเหตุ) จะจมไปกับพื้นหลังมืด
+ */
+.event__icon { color: color-mix(in srgb, var(--item-color) 55%, white); }
+.hazard-item__icon { color: color-mix(in srgb, var(--item-color) 55%, white); }
+.filter-row__icon { color: color-mix(in srgb, var(--row-color) 55%, white); }
+.detail-card__icon { color: color-mix(in srgb, var(--card-color) 55%, white); }
+.risk__advice .icon { color: color-mix(in srgb, var(--risk-color) 60%, white); }
+
+.factor__icon { color: var(--text-dim); }
+.searchbar__icon { color: var(--text-dim); }
+.search-result__pin { color: var(--accent); }
+.hazard-item__go { color: var(--text-dim); }
+.alert-banner__icon { color: #fff; }
+.filter-row__check .icon { width: .8em; height: .8em; }

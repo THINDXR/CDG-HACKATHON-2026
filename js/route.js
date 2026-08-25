@@ -14,23 +14,23 @@ window.Route = (function () {
     'sharp right': 'ขวาหักศอก',
   };
 
-  // ไอคอนลูกศรบนการ์ดนำทาง เลือกตามทิศที่ต้องเลี้ยว
+  // ชื่อไอคอนลูกศรบนการ์ดนำทาง เลือกตามทิศที่ต้องเลี้ยว
   const ARROW = {
-    left: '⬅',
-    right: '➡',
-    'slight left': '↖',
-    'slight right': '↗',
-    'sharp left': '⬅',
-    'sharp right': '➡',
-    straight: '⬆',
-    uturn: '⤺',
+    left: 'turnLeft',
+    right: 'turnRight',
+    'slight left': 'slightLeft',
+    'slight right': 'slightRight',
+    'sharp left': 'turnLeft',
+    'sharp right': 'turnRight',
+    straight: 'straight',
+    uturn: 'uturn',
   };
 
   function arrowFor(maneuver) {
-    if (maneuver.type === 'depart') return '⬆';
-    if (maneuver.type === 'arrive') return '🏁';
-    if (maneuver.type === 'roundabout' || maneuver.type === 'rotary') return '⟳';
-    return ARROW[maneuver.modifier] || '⬆';
+    if (maneuver.type === 'depart') return 'straight';
+    if (maneuver.type === 'arrive') return 'flag';
+    if (maneuver.type === 'roundabout' || maneuver.type === 'rotary') return 'roundabout';
+    return ARROW[maneuver.modifier] || 'straight';
   }
 
   /** ข้อความสั่งเลี้ยวภาษาไทย เช่น "เลี้ยวซ้ายเข้าถนนพระราม 4" */

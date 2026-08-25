@@ -6,8 +6,8 @@ window.MapView = (function () {
   let map = null;
   let ready = false;
   const readyQueue = [];
-  // plain = พื้นทึบไม่มี tile (ดีไซน์หลัก), vector = แผนที่จริง, satellite = ภาพถ่าย
-  let styleMode = 'plain';
+  // vector = แผนที่จริง (ค่าเริ่มต้น), plain = พื้นทึบไม่มี tile, satellite = ภาพถ่าย
+  let styleMode = 'vector';
   let markers = new Map(); // id -> maplibregl.Marker
   let userMarker = null;
   let destMarker = null;
@@ -62,7 +62,7 @@ window.MapView = (function () {
   function init(containerId) {
     map = new maplibregl.Map({
       container: containerId,
-      style: plainStyle(),
+      style: styleFor(styleMode),
       center: CFG.DEFAULT_CENTER,
       zoom: CFG.DEFAULT_ZOOM,
       // ดีไซน์เป็นแผนที่ 2 มิติ จึงไม่เอียงกล้องและไม่หมุน
@@ -117,11 +117,9 @@ window.MapView = (function () {
   /* ---------- ฉากสามมิติ ---------- */
 
   function applySceneEnhancements() {
-    // พื้นทึบไม่ต้องมีภูมิประเทศ ท้องฟ้า หรืออาคาร 3 มิติ
-    if (styleMode === 'plain') {
-      try { map.setTerrain(null); } catch (_) { /* ไม่มี terrain อยู่แล้ว */ }
-      return;
-    }
+    // มุมมองเป็น 2 มิติมองจากด้านบน จึงไม่ต้องมีภูมิประเทศ ท้องฟ้า หรืออาคาร 3 มิติ
+    try { map.setTerrain(null); } catch (_) { /* ไม่มี terrain อยู่แล้ว */ }
+    return;
 
     // ภูมิประเทศจากข้อมูลความสูงแบบเปิด
     try {
@@ -397,13 +395,13 @@ window.MapView = (function () {
     );
   }
 
-  /** มุมกล้องแบบนำทาง: ซูมใกล้ เอียงมาก และหันไปตามทิศที่รถวิ่ง */
+  /** มุมกล้องแบบนำทาง: ซูมใกล้ มองจากด้านบน และหันไปตามทิศที่รถวิ่ง */
   function navCamera(coord, heading) {
     if (!map || !coord) return;
     map.easeTo({
       center: coord,
       zoom: 17,
-      pitch: 60,
+      pitch: 0,
       bearing: typeof heading === 'number' ? heading : map.getBearing(),
       duration: 700,
       // เลื่อนจุดศูนย์กลางลงล่าง ให้เห็นถนนข้างหน้ามากกว่าข้างหลัง
@@ -527,6 +525,11 @@ window.MapView = (function () {
       node.classList.toggle('is-offscreen', !(inFrame && inRange && inFront));
       node.style.setProperty('--marker-scale', scale.toFixed(2));
     }
+
+    // ลูกศรตำแหน่งผู้ใช้ต้องโตตามซูมด้วย ไม่งั้นซูมเข้าไปแล้วจะดูเล็กจนหาไม่เจอ
+    if (userMarker) {
+      userMarker.getElement().style.setProperty('--puck-scale', scale.toFixed(2));
+    }
   }
 
   function buildMarkerElement(report) {
@@ -621,12 +624,16 @@ window.MapView = (function () {
   function setUserPuck(coord, heading) {
     if (!map || !coord) return;
     if (!userMarker) {
+      // หัวลูกศรชี้ไปตามทิศที่กำลังมุ่งหน้า พร้อมวงเรืองรอบ ๆ ให้หาเจอง่าย
+      // ห้ามแตะ transform ของ .user-puck เพราะ MapLibre ใช้วางตำแหน่ง/หมุนตามทิศ
+      // การย่อ-ขยายตามซูมจึงทำที่ชั้นลูก (.user-puck__inner) แทน
       const wrap = U.el('div', 'user-puck');
-      wrap.append(
-        U.el('div', 'user-puck__cone'),
-        U.el('div', 'user-puck__dot'),
-        U.el('div', 'user-puck__halo')
-      );
+      wrap.innerHTML =
+        '<div class="user-puck__inner">' +
+        '<div class="user-puck__halo"></div>' +
+        '<svg class="user-puck__arrow" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true">' +
+        '<path d="M16 3.5l9.5 22a1 1 0 0 1-1.4 1.2L16 22.4l-8.1 4.3a1 1 0 0 1-1.4-1.2z"/>' +
+        '</svg></div>';
       userMarker = new maplibregl.Marker({
         element: wrap,
         pitchAlignment: 'map',
@@ -640,6 +647,7 @@ window.MapView = (function () {
       userMarker.setRotation(heading);
       userMarker.getElement().classList.add('has-heading');
     }
+    updateMarkerView();
   }
 
   function followUser(coord, heading) {

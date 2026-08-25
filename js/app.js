@@ -8,6 +8,9 @@
   const LIST_RENDER_MS = 2000;
 
   function boot() {
+    // เติมไอคอน SVG ให้ element ที่ประกาศ data-icon ไว้ในหน้า HTML
+    window.Icons.paint();
+
     window.Store.load();
     window.MapView.init('map');
     window.UI.bind();
@@ -114,9 +117,11 @@
         window.MapView.setUserPuck(state.userPosition, state.userHeading);
 
         if (window.Navigate.isActive) {
-          // ขณะนำทาง กล้องเกาะรถและหันตามทิศเสมอ ไม่ต้องรอโหมดตามตำแหน่ง
           window.Navigate.update(state.userPosition);
-          window.MapView.navCamera(state.userPosition, state.userHeading);
+          // กล้องเกาะลูกศรเฉพาะตอนที่ยังล็อกอยู่ ถ้าผู้ใช้เลื่อนแผนที่เองจะปล่อยให้ดูอิสระ
+          if (state.following) {
+            window.MapView.navCamera(state.userPosition, state.userHeading);
+          }
         } else if (state.following) {
           window.MapView.followUser(state.userPosition, state.userHeading);
         }
@@ -128,7 +133,11 @@
         }
       }
 
-      if (reason === 'following' || reason === 'simulating') window.UI.syncStatusButtons();
+      if (reason === 'following' || reason === 'simulating') {
+        window.UI.syncStatusButtons();
+        // เลิก/กลับมาล็อกกล้อง มีผลกับปุ่ม "กลับไปตำแหน่งฉัน"
+        if (window.Navigate.isActive) window.UI.renderNav();
+      }
     });
   }
 

@@ -1,65 +1,68 @@
 /* ค่าคงที่และนิยามประเภทภัยบนถนน */
 window.APP_CONFIG = (function () {
+  // ไอคอนเป็น SVG จาก js/icons.js (โหลดก่อนไฟล์นี้) ไม่ใช้ emoji เพราะหน้าตาเพี้ยนตามระบบ
+  const ico = (name) => window.Icons.get(name);
+
   const HAZARD_TYPES = {
     accident: {
       label: 'อุบัติเหตุ',
-      icon: '🚗',
-      color: '#ff3b30',
+      icon: ico('accident'),
+      color: '#ff453a',
       defaultRadius: 400,
       defaultSeverity: 'high',
     },
     flood: {
       label: 'น้ำท่วมขัง',
-      icon: '🌊',
+      icon: ico('flood'),
       color: '#0a84ff',
       defaultRadius: 500,
       defaultSeverity: 'high',
     },
     construction: {
       label: 'ก่อสร้าง / ปิดถนน',
-      icon: '🚧',
+      icon: ico('construction'),
       color: '#ff9f0a',
       defaultRadius: 300,
       defaultSeverity: 'medium',
     },
     pothole: {
       label: 'หลุมบ่อ / ถนนชำรุด',
-      icon: '🕳️',
+      icon: ico('pothole'),
       color: '#d4a017',
       defaultRadius: 150,
       defaultSeverity: 'medium',
     },
     obstacle: {
       label: 'สิ่งกีดขวาง',
-      icon: '⚠️',
+      icon: ico('obstacle'),
       color: '#ffd60a',
       defaultRadius: 200,
       defaultSeverity: 'medium',
     },
     traffic: {
       label: 'รถติดหนัก',
-      icon: '🚦',
+      icon: ico('traffic'),
       color: '#bf5af2',
       defaultRadius: 600,
       defaultSeverity: 'low',
     },
     police: {
       label: 'ด่านตรวจ',
-      icon: '👮',
+      icon: ico('police'),
       color: '#5e5ce6',
       defaultRadius: 300,
       defaultSeverity: 'low',
     },
     fog: {
       label: 'ทัศนวิสัยต่ำ',
-      icon: '🌫️',
+      icon: ico('fog'),
       color: '#8e8e93',
       defaultRadius: 800,
       defaultSeverity: 'medium',
     },
     animal: {
       label: 'สัตว์บนถนน',
-      icon: '🐕',
+      icon: ico('animal'),
       color: '#ac8e68',
       defaultRadius: 250,
       defaultSeverity: 'medium',

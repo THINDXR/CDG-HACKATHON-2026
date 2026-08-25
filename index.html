@@ -23,7 +23,7 @@
   <!-- แถบบนสุด -->
   <header class="topbar glass">
     <div class="brand">
-      <div class="brand__mark">⚠️</div>
+      <div class="brand__mark" data-icon="obstacle"></div>
       <div class="brand__text">
         <strong>RoadWarn</strong>
         <span>เตือนภัยบนท้องถนน</span>
@@ -31,17 +31,17 @@
     </div>
 
     <div class="topbar__status">
-      <button id="btnMute" class="icon-btn" type="button" title="เปิด/ปิดเสียงเตือน" aria-label="เสียงเตือน">🔔</button>
+      <button id="btnMute" class="icon-btn" type="button" title="เปิด/ปิดเสียงเตือน" aria-label="เสียงเตือน"></button>
     </div>
   </header>
 
   <!-- ค้นหา -->
   <div class="searchbar glass">
-    <span class="searchbar__icon" aria-hidden="true">🔍</span>
+    <span class="searchbar__icon" id="searchIcon" aria-hidden="true"></span>
     <input id="searchInput" class="searchbar__input" type="search" autocomplete="off"
            placeholder="ค้นหาถนน หรือสถานที่..." aria-label="ค้นหาถนนหรือสถานที่" />
     <button id="btnTrack" class="searchbar__locate" type="button" title="ติดตามตำแหน่งของฉัน" aria-label="ติดตามตำแหน่ง">
-      <span id="trackLabel" aria-hidden="true">📍</span>
+      <span id="trackLabel" aria-hidden="true"></span>
     </button>
   </div>
 
@@ -53,7 +53,7 @@
 
   <!-- การ์ดนำทาง (แสดงเฉพาะตอนนำทางอยู่) -->
   <div id="navCard" class="nav-card" hidden aria-live="polite">
-    <div class="nav-card__arrow" id="navArrow">⬆</div>
+    <div class="nav-card__arrow" id="navArrow" data-icon="straight"></div>
     <div class="nav-card__body">
       <strong id="navDistance">—</strong>
       <span id="navInstruction">กำลังคำนวณเส้นทาง…</span>
@@ -76,6 +76,11 @@
     <button id="btnStopNav" class="nav-bar__stop" type="button">จบ</button>
   </div>
 
+  <!-- ปุ่มล็อกกล้องกลับไปที่ลูกศร (โผล่เมื่อผู้ใช้เลื่อนแผนที่เองระหว่างนำทาง) -->
+  <button id="btnRecenter" class="recenter" type="button" hidden data-icon="navigate">
+    <span></span>กลับไปตำแหน่งฉัน
+  </button>
+
   <!-- แถบแจ้งเตือนใหญ่ -->
   <div id="alertBanner" class="alert-banner" role="alert" aria-live="assertive" hidden>
     <div class="alert-banner__icon" id="alertIcon">⚠️</div>
@@ -83,7 +88,7 @@
       <strong id="alertTitle">ภัยข้างหน้า</strong>
       <span id="alertMeta">—</span>
     </div>
-    <button class="alert-banner__close" id="alertClose" type="button" aria-label="ปิด">✕</button>
+    <button class="alert-banner__close" id="alertClose" type="button" aria-label="ปิด" data-icon="close"></button>
   </div>
 
   <!-- แผ่นรายการภัย -->
@@ -93,7 +98,7 @@
         <h2>ความปลอดภัยรอบตัว</h2>
         <span id="sidebarCount" class="chip-count">0</span>
       </div>
-      <button id="btnBack" class="pill-btn" type="button">‹ กลับ</button>
+      <button id="btnBack" class="pill-btn" type="button" data-icon="arrowLeft"><span></span>กลับ</button>
       <button id="btnFilter" class="pill-btn" type="button">กรองข้อมูล</button>
     </div>
 
@@ -173,15 +178,15 @@
         <h3 class="panel__head">แผนที่</h3>
         <label class="switch-row">
           <span>แสดงแผนที่จริง (ถนน/ชื่อสถานที่)</span>
-          <input type="checkbox" id="setRealMap" />
+          <input type="checkbox" id="setRealMap" checked />
         </label>
         <label class="switch-row">
-          <span>โหมดจำลองการขับ 🚙</span>
+          <span>โหมดจำลองการขับ</span>
           <input type="checkbox" id="setSim" />
         </label>
         <p class="hint">
-          ค่าเริ่มต้นเป็นพื้นทึบเพื่อให้เห็นจุดแจ้งเหตุชัด ๆ
-          เปิดแผนที่จริงเมื่อต้องการดูว่าเหตุอยู่ถนนไหน
+          ปิดสวิตช์นี้เพื่อซ่อนถนนและชื่อสถานที่ เหลือพื้นทึบกับจุดแจ้งเหตุอย่างเดียว
+          เหมาะเวลาต้องการดูภาพรวมว่ามีเหตุกระจุกอยู่ตรงไหน
         </p>
       </div>
 
@@ -210,7 +215,7 @@
       <header class="sheet__head sheet__head--center">
         <h2>แจ้งเหตุบนถนน</h2>
         <p class="sheet__sub">ช่วยเตือนเพื่อนร่วมถนนด้วยการรายงานสิ่งที่คุณเห็น</p>
-        <button type="button" class="icon-btn" id="reportClose" aria-label="ปิด">✕</button>
+        <button type="button" class="icon-btn" id="reportClose" aria-label="ปิด" data-icon="close"></button>
       </header>
 
       <div class="type-grid" id="typeGrid"></div>
@@ -249,7 +254,7 @@
       <div class="sheet__handle" aria-hidden="true"></div>
       <header class="sheet__head">
         <h2>กรองข้อมูล</h2>
-        <button type="button" class="icon-btn" id="filterClose" aria-label="ปิด">✕</button>
+        <button type="button" class="icon-btn" id="filterClose" aria-label="ปิด" data-icon="close"></button>
       </header>
       <div id="filterList" class="filter-list"></div>
       <footer class="sheet__foot">
@@ -263,26 +268,27 @@
 
   <!-- ===== แถบแท็บล่าง ===== -->
   <nav class="tabbar" role="tablist" aria-label="เมนูหลัก">
-    <button class="tab is-active" id="tabMap" type="button" role="tab" data-view="map">
-      <span class="tab__icon">🗺️</span>
+    <button class="tab is-active" id="tabMap" type="button" role="tab" data-view="map" data-icon="map">
+      <span class="tab__icon"></span>
       <span class="tab__label">แผนที่</span>
     </button>
-    <button class="tab" id="tabReport" type="button" role="tab" data-view="report">
-      <span class="tab__icon">⚠️</span>
+    <button class="tab" id="tabReport" type="button" role="tab" data-view="report" data-icon="obstacle">
+      <span class="tab__icon"></span>
       <span class="tab__label">แจ้งเหตุ</span>
     </button>
-    <button class="tab" id="tabDashboard" type="button" role="tab" data-view="dashboard">
-      <span class="tab__icon">📊</span>
+    <button class="tab" id="tabDashboard" type="button" role="tab" data-view="dashboard" data-icon="dashboard">
+      <span class="tab__icon"></span>
       <span class="tab__label">แดชบอร์ด</span>
     </button>
-    <button class="tab" id="tabSettings" type="button" role="tab" data-view="settings">
-      <span class="tab__icon">⚙️</span>
+    <button class="tab" id="tabSettings" type="button" role="tab" data-view="settings" data-icon="settings">
+      <span class="tab__icon"></span>
       <span class="tab__label">ตั้งค่า</span>
     </button>
   </nav>
 </div>
 
   <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+  <script src="js/icons.js"></script>
   <script src="js/config.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/geocode.js"></script>
