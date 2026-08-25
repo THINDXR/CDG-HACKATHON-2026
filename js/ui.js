@@ -150,12 +150,6 @@ window.UI = (function () {
     box.style.setProperty('--risk-color', risk.level.color);
     box.dataset.level = risk.level.key;
 
-    // ป้ายย่อบนแผนที่ ใช้ข้อมูลชุดเดียวกัน
-    const chip = $('#riskChip');
-    chip.style.setProperty('--risk-color', risk.level.color);
-    chip.dataset.level = risk.level.key;
-    chip.querySelector('.risk-chip__label').textContent = risk.level.label;
-    chip.querySelector('.risk-chip__score').textContent = risk.score;
 
     const dominant = risk.dominantType ? CFG.HAZARD_TYPES[risk.dominantType] : null;
     const nearestText = risk.nearest && risk.nearest.distance != null
@@ -446,12 +440,166 @@ window.UI = (function () {
 
   /* ---------- ตั้งค่า ---------- */
 
-  function openSettings() {
+  function syncSettings() {
     $('#setSound').checked = window.Alerts.settings.sound;
     $('#setVoice').checked = window.Alerts.settings.voice;
     $('#setVibrate').checked = window.Alerts.settings.vibrate;
     $('#setSim').checked = window.Store.state.simulating;
-    openOverlay('#settingsSheet');
+    $('#setRealMap').checked = window.MapView.getStyleMode() !== 'plain';
+  }
+
+  /* ---------- แท็บล่าง ---------- */
+
+  const VIEWS = ['map', 'dashboard', 'settings'];
+  let currentView = 'map';
+
+  function setView(name) {
+    // "แจ้งเหตุ" ไม่ใช่หน้า แต่เป็นแผ่นซ้อน — เปิดแล้วคงแท็บเดิมไว้
+    if (name === 'report') {
+      openReportSheet();
+      syncTabs();
+      return;
+    }
+
+    currentView = name;
+    $('#viewDashboard').hidden = name !== 'dashboard';
+    $('#viewSettings').hidden = name !== 'settings';
+    // แผนที่กับแผ่นรายการเป็นของแท็บ "แผนที่"
+    $('#phone').classList.toggle('is-map-view', name === 'map');
+
+    if (name === 'dashboard') renderDashboard();
+    if (name === 'settings') syncSettings();
+    syncTabs();
+  }
+
+  function syncTabs() {
+    $$('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.view === currentView));
+  }
+
+  /* ---------- แดชบอร์ด ---------- */
+
+  function renderDashboard() {
+    const risk = window.Store.riskAssessment(origin());
+
+    // เกจวัด: คะแนนยิ่งต่ำยิ่งปลอดภัย จึงกลับด้านเป็น "คะแนนความปลอดภัย"
+    const safety = 100 - risk.score;
+    const arc = $('#gaugeArc');
+    const circumference = 2 * Math.PI * 52;
+    arc.style.strokeDasharray = `${circumference}`;
+    arc.style.strokeDashoffset = `${circumference * (1 - safety / 100)}`;
+    arc.style.stroke = risk.level.color;
+
+    $('#gaugeScore').textContent = safety;
+    $('#gaugeLabel').textContent = risk.level.label;
+    $('#dashArea').textContent = window.Store.state.userPosition
+      ? 'รอบตำแหน่งคุณ'
+      : 'รอบกลางจอแผนที่';
+
+    renderFactors(risk);
+    renderEvents();
+  }
+
+  /**
+   * ปัจจัยเสี่ยงคำนวณจากข้อมูลที่มีจริงในแอปเท่านั้น
+   * (ไม่ได้ต่อบริการพยากรณ์อากาศหรือสภาพจราจรจากภายนอก)
+   */
+  function renderFactors(risk) {
+    const box = $('#riskFactors');
+    const reports = window.Store.visibleReports();
+
+    const hour = new Date().getHours();
+    const rush = (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 19);
+    const night = hour >= 20 || hour <= 5;
+
+    const traffic = reports.filter((r) => r.type === 'traffic').length;
+    const flood = reports.filter((r) => r.type === 'flood').length;
+
+    const factors = [
+      {
+        icon: '🚧',
+        label: 'ความหนาแน่นของเหตุ',
+        detail: `${risk.count} จุดในรัศมี ${risk.radius / 1000} กม.`,
+        level: risk.count >= 8 ? 'high' : risk.count >= 4 ? 'medium' : 'low',
+      },
+      {
+        icon: '🚦',
+        label: 'สภาพจราจร',
+        detail: traffic ? `มีรายงานรถติด ${traffic} จุด` : 'ไม่มีรายงานรถติด',
+        level: traffic >= 2 ? 'high' : traffic ? 'medium' : 'low',
+      },
+      {
+        icon: '🌊',
+        label: 'น้ำท่วมขัง',
+        detail: flood ? `มีรายงานน้ำท่วม ${flood} จุด` : 'ไม่มีรายงานน้ำท่วม',
+        level: flood >= 2 ? 'high' : flood ? 'medium' : 'low',
+      },
+      {
+        icon: '🕒',
+        label: 'ช่วงเวลา',
+        detail: rush ? 'ชั่วโมงเร่งด่วน' : night ? 'กลางคืน ทัศนวิสัยลดลง' : 'นอกชั่วโมงเร่งด่วน',
+        level: rush ? 'high' : night ? 'medium' : 'low',
+      },
+    ];
+
+    const LEVEL = {
+      low: { text: 'ต่ำ', color: 'var(--ok)', width: 28 },
+      medium: { text: 'ปานกลาง', color: 'var(--warn)', width: 62 },
+      high: { text: 'สูง', color: 'var(--danger)', width: 92 },
+    };
+
+    box.innerHTML = factors
+      .map((f) => {
+        const l = LEVEL[f.level];
+        return `
+          <div class="factor">
+            <span class="factor__icon">${f.icon}</span>
+            <div class="factor__body">
+              <div class="factor__top">
+                <strong>${escapeHtml(f.label)}</strong>
+                <span class="factor__level" style="color:${l.color}">${l.text}</span>
+              </div>
+              <div class="factor__bar">
+                <div style="width:${l.width}%;background:${l.color}"></div>
+              </div>
+              <span class="factor__detail">${escapeHtml(f.detail)}</span>
+            </div>
+          </div>`;
+      })
+      .join('');
+  }
+
+  function renderEvents() {
+    const list = $('#dashEvents');
+    const items = window.Store.sortedByDistance(origin()).slice(0, 8);
+    list.innerHTML = '';
+
+    if (!items.length) {
+      list.innerHTML = '<li class="empty-state"><div>🛣️</div><p>ยังไม่มีรายงานในขณะนี้</p></li>';
+      return;
+    }
+
+    for (const item of items) {
+      const def = CFG.HAZARD_TYPES[item.type];
+      const li = el('li', 'event');
+      li.style.setProperty('--item-color', def.color);
+      li.innerHTML = `
+        <span class="event__icon">${def.icon}</span>
+        <div class="event__body">
+          <div class="event__top">
+            <strong>${escapeHtml(def.label)}</strong>
+            <span class="event__ago">${U.formatAgo(item.createdAt)}</span>
+          </div>
+          <p class="event__text">${escapeHtml(item.note || item.road)}</p>
+          <span class="event__meta">👍 ยืนยัน ${item.confirms} · ${U.formatDistance(item.distance || 0)}</span>
+        </div>`;
+      li.addEventListener('click', () => {
+        setView('map');
+        window.Store.select(item.id);
+        window.MapView.flyToReport(item);
+        collapseToMap();
+      });
+      list.appendChild(li);
+    }
   }
 
   /* ---------- แผ่นซ้อนทั่วไป ---------- */
@@ -707,7 +855,6 @@ window.UI = (function () {
       toast('รีเซ็ตข้อมูลตัวอย่างแล้ว');
     });
 
-    $('#btnReport').addEventListener('click', openReportSheet);
     $('#reportClose').addEventListener('click', closeReportSheet);
     $('#reportCancel').addEventListener('click', closeReportSheet);
     $('#reportForm').addEventListener('submit', submitReport);
@@ -739,11 +886,22 @@ window.UI = (function () {
       });
     });
 
-    $('#btnSettings').addEventListener('click', openSettings);
-    $('#settingsClose').addEventListener('click', () => closeOverlay('#settingsSheet'));
-    $('#settingsSheet').addEventListener('click', (e) => {
-      if (e.target.id === 'settingsSheet') closeOverlay('#settingsSheet');
+    // แท็บล่าง
+    $$('.tab').forEach((tab) => {
+      tab.addEventListener('click', () => setView(tab.dataset.view));
     });
+    $('#btnViewMap').addEventListener('click', () => setView('map'));
+    $('#btnReset2').addEventListener('click', () => {
+      window.Store.resetToSeed();
+      toast('รีเซ็ตข้อมูลตัวอย่างแล้ว');
+    });
+
+    // สลับพื้นทึบ / แผนที่จริง
+    $('#setRealMap').addEventListener('change', (e) => {
+      window.MapView.setStyleMode(e.target.checked ? 'vector' : 'plain');
+      toast(e.target.checked ? 'เปิดแผนที่จริงแล้ว' : 'กลับไปใช้พื้นทึบแล้ว');
+    });
+
     $('#setSound').addEventListener('change', (e) => {
       window.Alerts.setSetting('sound', e.target.checked);
       if (e.target.checked) window.Alerts.ensureAudio();
@@ -766,15 +924,15 @@ window.UI = (function () {
       stopNavigation();
       toast('จบการนำทางแล้ว');
     });
-    $('#riskChip').addEventListener('click', () => setDetent('half'));
     bindSheetDrag();
     setDetent('peek');
+    setView('map');
+    syncSettings();
 
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
       if (!$('#reportSheet').hidden) closeReportSheet();
       else if (!$('#filterSheet').hidden) closeOverlay('#filterSheet');
-      else if (!$('#settingsSheet').hidden) closeOverlay('#settingsSheet');
       else if (window.Store.state.selectedId) window.Store.select(null);
     });
   }
@@ -785,6 +943,9 @@ window.UI = (function () {
     renderRisk,
     renderDetail,
     renderNav,
+    renderDashboard,
+    setView,
+    syncSettings,
     startNavigation,
     stopNavigation,
     showDetailSheet: collapseToMap,

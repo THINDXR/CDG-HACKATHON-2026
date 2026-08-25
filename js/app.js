@@ -178,17 +178,8 @@
   /* ---------- ปุ่มควบคุมแผนที่ ---------- */
 
   function wireMapControls() {
-    $('#btnCompass').addEventListener('click', () => window.MapView.resetNorth());
-    $('#btn3D').addEventListener('click', () => window.MapView.toggle3D());
     $('#btnZoomIn').addEventListener('click', () => window.MapView.zoomBy(1));
     $('#btnZoomOut').addEventListener('click', () => window.MapView.zoomBy(-1));
-
-    $('#btnLayers').addEventListener('click', (e) => {
-      const next = window.MapView.getStyleMode() === 'vector' ? 'satellite' : 'vector';
-      window.MapView.setStyleMode(next);
-      e.currentTarget.classList.toggle('is-active', next === 'satellite');
-      window.UI.toast(next === 'satellite' ? 'มุมมองดาวเทียม' : 'มุมมองแผนที่ 3 มิติ');
-    });
   }
 
   if (document.readyState === 'loading') {

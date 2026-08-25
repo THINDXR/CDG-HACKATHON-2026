@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="RoadWarn" />
-  <meta name="theme-color" content="#0b0f18" />
+  <meta name="theme-color" content="#0e1116" />
   <meta name="color-scheme" content="dark" />
   <title>RoadWarn · เตือนภัยบนท้องถนน</title>
 
@@ -32,7 +32,6 @@
 
     <div class="topbar__status">
       <button id="btnMute" class="icon-btn" type="button" title="เปิด/ปิดเสียงเตือน" aria-label="เสียงเตือน">🔔</button>
-      <button id="btnSettings" class="icon-btn" type="button" title="ตั้งค่าการแจ้งเตือน" aria-label="ตั้งค่า">⚙️</button>
     </div>
   </header>
 
@@ -91,7 +90,7 @@
   <aside id="sidebar" class="sidebar glass">
     <div class="sidebar__head">
       <div class="sidebar__title">
-        <h2>ภัยใกล้คุณ</h2>
+        <h2>ความปลอดภัยรอบตัว</h2>
         <span id="sidebarCount" class="chip-count">0</span>
       </div>
       <button id="btnBack" class="pill-btn" type="button">‹ กลับ</button>
@@ -110,45 +109,110 @@
     </div>
   </aside>
 
-  <!-- ป้ายความเสี่ยงบนแผนที่ (แสดงเมื่อปิดแผ่นรายการ) -->
-  <button id="riskChip" class="risk-chip" type="button">
-    <span class="risk-chip__dot"></span>
-    <span class="risk-chip__label">กำลังประเมิน…</span>
-    <span class="risk-chip__score"></span>
-  </button>
+  <!-- ===== แท็บ: แดชบอร์ด ===== -->
+  <section id="viewDashboard" class="view" hidden aria-label="แดชบอร์ดความเสี่ยง">
+    <div class="view__scroll">
+      <div class="panel">
+        <h2 class="panel__title">ความปลอดภัยบริเวณนี้</h2>
+        <p class="panel__sub">คำนวณจากรายงานของผู้ใช้แบบเรียลไทม์</p>
+        <div class="gauge" id="dashGauge">
+          <svg viewBox="0 0 120 120" width="150" height="150" aria-hidden="true">
+            <circle class="gauge__track" cx="60" cy="60" r="52" />
+            <circle class="gauge__value" id="gaugeArc" cx="60" cy="60" r="52" />
+          </svg>
+          <div class="gauge__center">
+            <strong id="gaugeScore">—</strong>
+            <span id="gaugeLabel">กำลังประเมิน</span>
+          </div>
+        </div>
+        <div class="panel__tags">
+          <span class="tag tag--live"><span class="tag__dot"></span>สด</span>
+          <span class="tag" id="dashArea">รอบตำแหน่งคุณ</span>
+        </div>
+      </div>
 
-  <!-- ปุ่มควบคุมแผนที่ -->
+      <div class="panel">
+        <h3 class="panel__head">วิเคราะห์ปัจจัยเสี่ยง</h3>
+        <div id="riskFactors" class="factors"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__row">
+          <h3 class="panel__head">เหตุการณ์ล่าสุด</h3>
+          <button class="link-btn" id="btnViewMap" type="button">ดูบนแผนที่</button>
+        </div>
+        <ul id="dashEvents" class="event-list"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== แท็บ: ตั้งค่า ===== -->
+  <section id="viewSettings" class="view" hidden aria-label="ตั้งค่า">
+    <div class="view__scroll">
+      <div class="panel">
+        <h3 class="panel__head">การแจ้งเตือน</h3>
+        <label class="switch-row">
+          <span>เสียงเตือน</span>
+          <input type="checkbox" id="setSound" />
+        </label>
+        <label class="switch-row">
+          <span>อ่านออกเสียงภาษาไทย</span>
+          <input type="checkbox" id="setVoice" />
+        </label>
+        <label class="switch-row">
+          <span>สั่นเตือน (มือถือ)</span>
+          <input type="checkbox" id="setVibrate" />
+        </label>
+        <p class="hint">
+          ระบบจะเตือนเมื่อมีภัยอยู่ในเส้นทางข้างหน้าภายในระยะประมาณ 900 เมตร
+          และจะไม่เตือนซ้ำจุดเดิมภายใน 5 นาที
+        </p>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel__head">แผนที่</h3>
+        <label class="switch-row">
+          <span>แสดงแผนที่จริง (ถนน/ชื่อสถานที่)</span>
+          <input type="checkbox" id="setRealMap" />
+        </label>
+        <label class="switch-row">
+          <span>โหมดจำลองการขับ 🚙</span>
+          <input type="checkbox" id="setSim" />
+        </label>
+        <p class="hint">
+          ค่าเริ่มต้นเป็นพื้นทึบเพื่อให้เห็นจุดแจ้งเหตุชัด ๆ
+          เปิดแผนที่จริงเมื่อต้องการดูว่าเหตุอยู่ถนนไหน
+        </p>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel__head">ข้อมูล</h3>
+        <div class="switch-row">
+          <span id="statsLine2">—</span>
+          <button class="link-btn" id="btnReset2" type="button">รีเซ็ตข้อมูลตัวอย่าง</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ปุ่มควบคุมแผนที่ (มุมมอง 2 มิติ จึงเหลือแค่ซูม) -->
   <div class="map-controls">
-    <button class="map-btn compass" id="btnCompass" type="button" title="หันไปทางทิศเหนือ" aria-label="ทิศเหนือ">
-      <svg id="compassNeedle" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-        <polygon points="12,3 15.5,13 12,11 8.5,13" fill="#ff453a"></polygon>
-        <polygon points="12,21 8.5,11 12,13 15.5,11" fill="#8e8e93"></polygon>
-      </svg>
-    </button>
-    <button class="map-btn" id="btn3D" type="button" title="สลับมุมมอง 3 มิติ">3D</button>
-    <button class="map-btn" id="btnLayers" type="button" title="สลับแผนที่ดาวเทียม">🛰️</button>
     <div class="map-btn-group">
       <button class="map-btn" id="btnZoomIn" type="button" aria-label="ขยาย">＋</button>
       <button class="map-btn" id="btnZoomOut" type="button" aria-label="ย่อ">－</button>
     </div>
   </div>
 
-  <!-- ปุ่มแจ้งเหตุ -->
-  <button id="btnReport" class="fab" type="button">
-    <span class="fab__icon">＋</span>
-    <span class="fab__label">แจ้งเหตุ</span>
-  </button>
-
   <!-- ฟอร์มแจ้งเหตุ -->
   <div id="reportSheet" class="sheet-backdrop" hidden>
     <form class="sheet glass" id="reportForm">
       <div class="sheet__handle" aria-hidden="true"></div>
-      <header class="sheet__head">
+      <header class="sheet__head sheet__head--center">
         <h2>แจ้งเหตุบนถนน</h2>
+        <p class="sheet__sub">ช่วยเตือนเพื่อนร่วมถนนด้วยการรายงานสิ่งที่คุณเห็น</p>
         <button type="button" class="icon-btn" id="reportClose" aria-label="ปิด">✕</button>
       </header>
 
-      <label class="field-label">ประเภทเหตุ</label>
       <div class="type-grid" id="typeGrid"></div>
 
       <span class="field-label">ระดับความรุนแรง</span>
@@ -195,38 +259,27 @@
     </div>
   </div>
 
-  <!-- ตั้งค่า -->
-  <div id="settingsSheet" class="sheet-backdrop" hidden>
-    <div class="sheet glass">
-      <div class="sheet__handle" aria-hidden="true"></div>
-      <header class="sheet__head">
-        <h2>ตั้งค่าการแจ้งเตือน</h2>
-        <button type="button" class="icon-btn" id="settingsClose" aria-label="ปิด">✕</button>
-      </header>
-      <label class="switch-row">
-        <span>เสียงเตือน</span>
-        <input type="checkbox" id="setSound" />
-      </label>
-      <label class="switch-row">
-        <span>อ่านออกเสียงภาษาไทย</span>
-        <input type="checkbox" id="setVoice" />
-      </label>
-      <label class="switch-row">
-        <span>สั่นเตือน (มือถือ)</span>
-        <input type="checkbox" id="setVibrate" />
-      </label>
-      <label class="switch-row">
-        <span>โหมดจำลองการขับ 🚙</span>
-        <input type="checkbox" id="setSim" />
-      </label>
-      <p class="hint">
-        ระบบจะเตือนเมื่อมีภัยอยู่ในเส้นทางข้างหน้าภายในระยะประมาณ 900 เมตร
-        และจะไม่เตือนซ้ำจุดเดิมภายใน 5 นาที
-      </p>
-    </div>
-  </div>
-
   <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <!-- ===== แถบแท็บล่าง ===== -->
+  <nav class="tabbar" role="tablist" aria-label="เมนูหลัก">
+    <button class="tab is-active" id="tabMap" type="button" role="tab" data-view="map">
+      <span class="tab__icon">🗺️</span>
+      <span class="tab__label">แผนที่</span>
+    </button>
+    <button class="tab" id="tabReport" type="button" role="tab" data-view="report">
+      <span class="tab__icon">⚠️</span>
+      <span class="tab__label">แจ้งเหตุ</span>
+    </button>
+    <button class="tab" id="tabDashboard" type="button" role="tab" data-view="dashboard">
+      <span class="tab__icon">📊</span>
+      <span class="tab__label">แดชบอร์ด</span>
+    </button>
+    <button class="tab" id="tabSettings" type="button" role="tab" data-view="settings">
+      <span class="tab__icon">⚙️</span>
+      <span class="tab__label">ตั้งค่า</span>
+    </button>
+  </nav>
 </div>
 
   <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>

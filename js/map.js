@@ -1,4 +1,4 @@
-/* แผนที่ 3 มิติ (MapLibre GL) — มุมกล้องเอียง อาคาร 3D ภูมิประเทศ และท้องฟ้า */
+/* แผนที่ (MapLibre GL) — ค่าเริ่มต้นเป็น 2 มิติพื้นทึบ สลับดูแผนที่จริง/ดาวเทียมได้ */
 window.MapView = (function () {
   const CFG = window.APP_CONFIG;
   const U = window.Utils;
@@ -6,7 +6,8 @@ window.MapView = (function () {
   let map = null;
   let ready = false;
   const readyQueue = [];
-  let styleMode = 'vector';
+  // plain = พื้นทึบไม่มี tile (ดีไซน์หลัก), vector = แผนที่จริง, satellite = ภาพถ่าย
+  let styleMode = 'plain';
   let markers = new Map(); // id -> maplibregl.Marker
   let userMarker = null;
   let destMarker = null;
@@ -14,6 +15,26 @@ window.MapView = (function () {
   let onMarkerClick = () => {};
   let onMapClick = () => {};
   let pickMode = false;
+
+  /**
+   * สไตล์พื้นทึบ — ไม่มี tile ถนน แม่น้ำ หรือชื่อสถานที่เลย
+   * เหลือแต่พื้นสีเดียวให้หมุดแจ้งเหตุลอยอยู่ตามพิกัดจริง ตามดีไซน์ที่ต้องการ
+   */
+  function plainStyle() {
+    return {
+      version: 8,
+      sources: {},
+      layers: [
+        { id: 'bg', type: 'background', paint: { 'background-color': '#151a21' } },
+      ],
+    };
+  }
+
+  function styleFor(mode) {
+    if (mode === 'satellite') return satelliteStyle();
+    if (mode === 'vector') return CFG.STYLE_VECTOR;
+    return plainStyle();
+  }
 
   /* ---------- สร้างสไตล์ดาวเทียม (raster ล้วน) ---------- */
   function satelliteStyle() {
@@ -41,11 +62,12 @@ window.MapView = (function () {
   function init(containerId) {
     map = new maplibregl.Map({
       container: containerId,
-      style: CFG.STYLE_VECTOR,
+      style: plainStyle(),
       center: CFG.DEFAULT_CENTER,
       zoom: CFG.DEFAULT_ZOOM,
-      pitch: CFG.DEFAULT_PITCH,
-      bearing: CFG.DEFAULT_BEARING,
+      // ดีไซน์เป็นแผนที่ 2 มิติ จึงไม่เอียงกล้องและไม่หมุน
+      pitch: 0,
+      bearing: 0,
       maxPitch: 85,
       antialias: true,
       attributionControl: false,
@@ -95,6 +117,12 @@ window.MapView = (function () {
   /* ---------- ฉากสามมิติ ---------- */
 
   function applySceneEnhancements() {
+    // พื้นทึบไม่ต้องมีภูมิประเทศ ท้องฟ้า หรืออาคาร 3 มิติ
+    if (styleMode === 'plain') {
+      try { map.setTerrain(null); } catch (_) { /* ไม่มี terrain อยู่แล้ว */ }
+      return;
+    }
+
     // ภูมิประเทศจากข้อมูลความสูงแบบเปิด
     try {
       if (!map.getSource('terrain-dem')) {
@@ -543,9 +571,11 @@ window.MapView = (function () {
 
     // รายงานอาจกระจายทั้งเมือง ถ้าย่อจนพอดีทุกจุดหมุดจะเล็กและอาคาร 3 มิติหาย
     // จึงตรึงระดับซูมไว้ในช่วงที่ยังเห็นหมุดชัดและยังเป็นมุมมองสามมิติ
-    const zoom = Math.max(14, Math.min(15.2, camera.zoom));
-    // ตั้งต้นหันทิศเหนือ เข็มทิศจะซ่อนไว้จนกว่าผู้ใช้จะหมุนแผนที่เอง
-    map.easeTo({ center: camera.center, zoom, pitch: 55, bearing: 0, duration });
+    // พื้นทึบไม่มีถนนให้ดู จึงย่อได้มากกว่าเพื่อให้เห็นจุดแจ้งเหตุครบ ๆ
+    const minZoom = styleMode === 'plain' ? 11.5 : 13.5;
+    const zoom = Math.max(minZoom, Math.min(15.2, camera.zoom));
+    // มุมมอง 2 มิติ หันทิศเหนือเสมอ
+    map.easeTo({ center: camera.center, zoom, pitch: 0, bearing: 0, duration });
     updateCompass();
     return true;
   }
@@ -653,18 +683,8 @@ window.MapView = (function () {
     map.easeTo({ zoom: map.getZoom() + delta, duration: 300 });
   }
 
-  function updateCompass() {
-    const bearing = map.getBearing();
-    const needle = document.getElementById('compassNeedle');
-    if (needle) needle.style.transform = `rotate(${-bearing}deg)`;
-
-    const btn = document.getElementById('btn3D');
-    if (btn) btn.classList.toggle('is-active', map.getPitch() > 20);
-
-    // หันเหนืออยู่แล้วก็ไม่ต้องมีปุ่ม "หันไปทิศเหนือ" ให้รก
-    const compass = document.getElementById('btnCompass');
-    if (compass) compass.classList.toggle('is-hidden', Math.abs(bearing) < 1);
-  }
+  // มุมมองเป็น 2 มิติ หันทิศเหนือเสมอ จึงไม่มีเข็มทิศให้อัปเดตแล้ว
+  function updateCompass() {}
 
   /* ---------- โหมดสไตล์ ---------- */
 
@@ -673,7 +693,7 @@ window.MapView = (function () {
     styleMode = mode;
     markers.forEach((m) => m.remove());
     markers.clear();
-    map.setStyle(mode === 'satellite' ? satelliteStyle() : CFG.STYLE_VECTOR, {
+    map.setStyle(styleFor(mode), {
       diff: false,
     });
   }

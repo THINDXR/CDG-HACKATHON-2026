@@ -3,25 +3,30 @@
 :root {
   color-scheme: dark;
 
-  --bg: #0b0f18;
-  --surface: rgba(24, 29, 41, 0.78);
-  --surface-solid: #151a26;
-  --surface-raised: #1c2231;
-  --border: rgba(255, 255, 255, 0.09);
-  --text: #f3f5f9;
-  --text-dim: #8b93a7;
-  --accent: #ff7a1a;
-  --accent-soft: rgba(255, 122, 26, 0.16);
-  --danger: #ff453a;
+  /* พื้นหลังเทาเข้ม/ดำ ตัดด้วยเหลือง-ส้มสำหรับสถานะที่กำลังทำงานอยู่ */
+  --bg: #0e1116;
+  --map-bg: #151a21;          /* พื้นแผนที่ทึบ (ไม่มี tile) */
+  --surface: rgba(24, 28, 36, 0.82);
+  --surface-solid: #181c24;
+  --surface-raised: #21262f;
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #f5f7fa;
+  --text-dim: #8a92a3;
+  --accent: #ffc233;          /* เหลืองสด — แท็บที่เลือก ปุ่มหลัก */
+  --accent-2: #ff7a1a;        /* ส้ม — ไฮไลต์รอง */
+  --accent-soft: rgba(255, 194, 51, 0.16);
+  --danger: #ff4d4f;
   --warn: #ff9f0a;
-  --ok: #30d158;
-  --shadow: 0 12px 38px rgba(0, 0, 0, 0.62);
-  --shadow-sm: 0 3px 14px rgba(0, 0, 0, 0.5);
+  --ok: #22c55e;
+  --route: #8b5cf6;
+  --shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 3px 14px rgba(0, 0, 0, 0.45);
   --radius: 18px;
   --radius-sm: 14px;
   --topbar-h: 56px;
   --search-h: 44px;
   --chips-h: 34px;
+  --tabbar-h: 62px;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
@@ -151,7 +156,239 @@ button:active { transform: scale(0.96); }
 #map {
   position: absolute;
   inset: 0;
+  background: var(--map-bg);
 }
+
+/* ---------------- แถบแท็บล่าง ---------------- */
+
+.tabbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  height: calc(var(--tabbar-h) + var(--safe-b));
+  padding: 0 6px var(--safe-b);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  background: var(--surface-solid);
+  border-top: 1px solid var(--border);
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.tab__icon {
+  width: 44px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  border-radius: 999px;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+/* แท็บที่เลือกอยู่ = วงกลมเหลืองเด่น ตามดีไซน์ */
+.tab.is-active { color: var(--text); }
+.tab.is-active .tab__icon {
+  background: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(255, 194, 51, 0.4);
+}
+
+/* ---------------- หน้าจอแบบเต็ม (แดชบอร์ด / ตั้งค่า) ---------------- */
+
+.view {
+  position: absolute;
+  inset: 0 0 calc(var(--tabbar-h) + var(--safe-b)) 0;
+  z-index: 30;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.view__scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: calc(var(--safe-t) + 16px) 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panel {
+  border-radius: 20px;
+  padding: 16px;
+  background: var(--surface);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.panel__title { margin: 0; font-size: 17px; text-align: center; }
+.panel__sub {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  text-align: center;
+}
+.panel__head { margin: 0 0 12px; font-size: 15px; }
+.panel__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.panel__row .panel__head { margin: 0; }
+
+.panel__tags {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.tag__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+/* ---------------- เกจคะแนนความปลอดภัย ---------------- */
+
+.gauge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin: 10px auto 6px;
+  width: 150px;
+  height: 150px;
+}
+.gauge svg { transform: rotate(-90deg); }
+.gauge__track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--text) 12%, transparent);
+  stroke-width: 10;
+}
+.gauge__value {
+  fill: none;
+  stroke: var(--ok);
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.gauge__center {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.gauge__center strong { font-size: 38px; letter-spacing: -1px; line-height: 1; }
+.gauge__center span { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+
+/* ---------------- ปัจจัยเสี่ยง ---------------- */
+
+.factors { display: flex; flex-direction: column; gap: 14px; }
+
+.factor { display: flex; gap: 11px; align-items: flex-start; }
+.factor__icon {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  border-radius: 11px;
+  background: var(--surface-raised);
+}
+.factor__body { flex: 1; min-width: 0; }
+.factor__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.factor__top strong { font-size: 13.5px; }
+.factor__level { font-size: 12px; font-weight: 700; }
+.factor__bar {
+  height: 6px;
+  margin: 6px 0 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  overflow: hidden;
+}
+.factor__bar div { height: 100%; border-radius: 999px; transition: width 0.5s ease; }
+.factor__detail { font-size: 11px; color: var(--text-dim); }
+
+/* ---------------- รายการเหตุการณ์ในแดชบอร์ด ---------------- */
+
+.event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.event {
+  display: flex;
+  gap: 11px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.event:hover { border-color: color-mix(in srgb, var(--item-color) 50%, transparent); }
+.event__icon {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--item-color) 22%, transparent);
+}
+.event__body { flex: 1; min-width: 0; }
+.event__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.event__top strong { font-size: 13.5px; }
+.event__ago { font-size: 10.5px; color: var(--text-dim); flex: none; }
+.event__text {
+  margin: 3px 0 5px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.event__meta { font-size: 11px; color: var(--text-dim); }
 
 .glass {
   background: var(--surface);
@@ -490,7 +727,7 @@ button:active { transform: scale(0.96); }
 .phone.is-navigating .quickfilters,
 .phone.is-navigating .sidebar,
 .phone.is-navigating .risk-chip,
-.phone.is-navigating .fab {
+.phone.is-navigating .tabbar {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s ease;
@@ -934,30 +1171,6 @@ button:active { transform: scale(0.96); }
 
 .compass svg { transition: transform 0.15s ease-out; }
 
-/* ---------------- ปุ่มแจ้งเหตุ ---------------- */
-
-.fab {
-  position: absolute;
-  right: max(16px, var(--safe-r));
-  bottom: max(20px, calc(var(--safe-b) + 12px));
-  z-index: 22;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 52px;
-  padding: 0 22px 0 18px;
-  border: 0;
-  border-radius: 26px;
-  background: linear-gradient(140deg, #ff453a, #ff9f0a);
-  color: #fff;
-  font-size: 15px;
-  font-weight: 600;
-  box-shadow: 0 10px 28px rgba(255, 69, 58, 0.42);
-  transition: transform 0.16s ease, box-shadow 0.16s ease;
-}
-.fab:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(255, 69, 58, 0.5); }
-.fab__icon { font-size: 20px; font-weight: 400; }
-
 /* ---------------- หน้ารายละเอียด (อยู่ในแผ่นเดียวกัน) ---------------- */
 
 /* โหมดปกติ: ซ่อนหน้ารายละเอียดกับปุ่มย้อนกลับไว้ */
@@ -1082,6 +1295,21 @@ button:active { transform: scale(0.96); }
   justify-content: space-between;
   margin-bottom: 14px;
 }
+
+/* หัวแผ่นแบบจัดกึ่งกลาง (ใช้ในแผ่นแจ้งเหตุ) */
+.sheet__head--center {
+  position: relative;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 18px;
+  text-align: center;
+}
+.sheet__head--center .icon-btn {
+  position: absolute;
+  top: -2px;
+  right: 0;
+}
+.sheet__sub { margin: 0; font-size: 12px; color: var(--text-dim); }
 .sheet__head h2 { margin: 0; font-size: 19px; letter-spacing: -0.3px; }
 
 .field-label {
@@ -1458,7 +1686,7 @@ body.picking .phone > #map::after {
     top: auto;
     left: max(8px, var(--safe-l));
     right: max(8px, var(--safe-r));
-    bottom: max(8px, var(--safe-b));
+    bottom: calc(var(--tabbar-h) + var(--safe-b) + 6px);
     width: auto;
     /* สูงพอที่ระดับ "เต็ม" จะยังไม่บังแถบค้นหาและชิปกรองด้านบน */
     height: 71cqh;
@@ -1468,27 +1696,15 @@ body.picking .phone > #map::after {
   }
   .sidebar.is-dragging { transition: none; }
 
-  /* ระดับ "แง้ม" ยังกดแจ้งเหตุได้ จึงยกปุ่มขึ้นเหนือแผ่นแทนการซ่อน */
-  .sidebar[data-detent='peek'] ~ .fab {
-    bottom: calc(31cqh + 26px);
-    transition: bottom 0.32s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.2s ease;
-  }
-  .sidebar[data-detent='half'] ~ .fab,
-  .sidebar[data-detent='full'] ~ .fab {
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease;
-  }
-
   /* เปิดแผ่นแล้วมีการ์ดความเสี่ยงเต็มอยู่ข้างใน จึงซ่อนป้ายย่อ */
   .sidebar.is-open ~ .risk-chip {
     opacity: 0;
     pointer-events: none;
   }
 
-  /* ยกปุ่มควบคุมขึ้นอีกชั้น ไม่ให้ทับปุ่มแจ้งเหตุที่อยู่มุมเดียวกัน */
+  /* ยกปุ่มควบคุมขึ้นเหนือแผ่นตอนแง้ม */
   .sidebar[data-detent='peek'] ~ .map-controls {
-    bottom: calc(31cqh + 88px);
+    bottom: calc(31cqh + var(--tabbar-h) + 20px);
     transition: bottom 0.32s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.2s ease;
   }
   .sidebar[data-detent='half'] ~ .map-controls,
@@ -1542,7 +1758,6 @@ body.picking .phone > #map::after {
   .map-controls { top: auto; bottom: max(88px, calc(var(--safe-b) + 76px)); right: max(12px, var(--safe-r)); }
   .map-btn { width: 46px; height: 46px; font-size: 16px; }
   .toasts { bottom: max(150px, calc(var(--safe-b) + 138px)); }
-  .fab { padding: 0 18px; height: 50px; }
 
   .maplibregl-ctrl-attrib { max-width: 62cqw; }
   .detail-card__stats span { font-size: 10.5px; }
@@ -1560,7 +1775,6 @@ body.picking .phone > #map::after {
     transform: translateY(100%);
   }
   /* แผ่นตั้งค่าไม่มีแถบปุ่มล่าง จึงต้องเว้นระยะเอง */
-  #settingsSheet .sheet { padding-bottom: calc(var(--safe-b) + 16px); }
   .sheet-backdrop.is-open .sheet { transform: none; }
   .sheet__handle { display: block; }
 
@@ -1603,8 +1817,7 @@ body.picking .phone > #map::after {
   .type-card__icon { width: 58px; height: 58px; font-size: 25px; }
 
   .alert-banner { width: calc(100cqw - max(24px, calc(var(--safe-l) + var(--safe-r) + 16px))); }
-  .fab__label { font-size: 14px; }
-}
+  }
 
 /* จอแคบ (iPhone SE / mini) — ย่อปุ่มลงเพื่อให้ชื่อแอปยังอยู่ครบ */
 @container phone (max-width: 385px) {

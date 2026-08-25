@@ -82,7 +82,7 @@ window.APP_CONFIG = (function () {
     DEFAULT_PITCH: 62,
     DEFAULT_BEARING: -22,
 
-    // สไตล์แผนที่ (ไม่ต้องใช้ API key) — ใช้โทนมืดให้เข้ากับธีมแอป
+    // สไตล์แผนที่ (ไม่ต้องใช้ API key) — ใช้เมื่อผู้ใช้เปิด "แผนที่จริง"
     STYLE_VECTOR: 'https://tiles.openfreemap.org/styles/dark',
     TERRAIN_TILES:
       'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png',
