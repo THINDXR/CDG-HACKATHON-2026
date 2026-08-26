@@ -46,13 +46,12 @@
     <span class="searchbar__icon" id="searchIcon" aria-hidden="true"></span>
     <input id="searchInput" class="searchbar__input" type="search" autocomplete="off"
            placeholder="ค้นหาถนน หรือสถานที่..." aria-label="ค้นหาถนนหรือสถานที่" />
-    <button id="btnTrack" class="searchbar__locate" type="button" title="ติดตามตำแหน่งของฉัน" aria-label="ติดตามตำแหน่ง">
-      <span id="trackLabel" aria-hidden="true"></span>
+    <button id="btnTrack" class="searchbar__locate" type="button" title="เริ่ม/หยุดติดตามตำแหน่ง" aria-label="ติดตามตำแหน่ง">
+      <span id="trackLabel" aria-hidden="true" data-icon="pin"></span>
     </button>
   </div>
 
   <!-- ผลค้นหาสถานที่จริง -->
-  <div id="searchResults" class="search-results glass" hidden role="listbox" aria-label="ผลการค้นหาสถานที่"></div>
 
   <!-- ชิปกรองประเภทภัย -->
   <div class="quickfilters" id="quickFilters" role="group" aria-label="กรองประเภทภัย"></div>
@@ -101,7 +100,7 @@
   <aside id="sidebar" class="sidebar glass">
     <div class="sidebar__head">
       <div class="sidebar__title">
-        <h2>ความปลอดภัยรอบตัว</h2>
+        <h2 id="sheetTitle">ความปลอดภัยรอบตัว</h2>
         <span id="sidebarCount" class="chip-count">0</span>
       </div>
       <button id="btnBack" class="pill-btn" type="button" data-icon="arrowLeft"><span></span>กลับ</button>
@@ -111,6 +110,9 @@
     <section id="riskPanel" class="risk" aria-live="polite" aria-label="ระดับความเสี่ยงรอบตัว"></section>
 
     <ul id="hazardList" class="hazard-list"></ul>
+
+    <!-- โหมดค้นหา: แผ่นเดียวกันแต่เปลี่ยนเนื้อหาเป็นผลค้นหาสถานที่ -->
+    <div id="placeResults" class="place-results" aria-live="polite"></div>
 
     <section id="sheetDetail" class="sheet-detail" aria-live="polite"></section>
 

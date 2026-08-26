@@ -140,12 +140,18 @@ window.Alerts = (function () {
 
   /* ---------- คำนวณภัยข้างหน้า ---------- */
 
+  // ระหว่างนำทางไม่ต้องเตือนเรื่องพวกนี้ เพราะไม่ได้กระทบการขับตรงหน้า
+  // ปล่อยให้ผู้ขับโฟกัสกับสิ่งที่ต้องหลบจริง ๆ
+  const SKIP_WHILE_NAVIGATING = new Set(['police', 'fog', 'animal']);
+
   /** คืนรายการภัยที่อยู่ในระยะเตือน เรียงจากใกล้สุด */
   function evaluate(position, heading) {
     if (!position) return [];
     const results = [];
+    const navigating = window.Navigate?.isActive;
 
     for (const r of window.Store.visibleReports()) {
+      if (navigating && SKIP_WHILE_NAVIGATING.has(r.type)) continue;
       const target = [r.lng, r.lat];
       const dist = U.distance(position, target);
       const triggerAt = r.radius + LOOKAHEAD_M;

@@ -668,58 +668,73 @@ window.UI = (function () {
 
   /* ---------- ค้นหา ---------- */
 
+  /**
+   * เข้า/ออกโหมดค้นหา — แผ่นเดียวกันแต่สลับเนื้อหา
+   * จากสรุปความปลอดภัย เป็นรายการสถานที่ที่ค้นเจอ
+   */
+  function setSearchMode(on) {
+    $('#sidebar').classList.toggle('is-searching', on);
+    $('#sheetTitle').textContent = on ? 'ค้นหาสถานที่' : 'ความปลอดภัยรอบตัว';
+    $('#sidebarCount').hidden = on;
+  }
+
   function hideSearchResults() {
-    const box = $('#searchResults');
-    box.hidden = true;
-    box.innerHTML = '';
+    setSearchMode(false);
+    $('#placeResults').innerHTML = '';
+  }
+
+  function showPlaceNote(text) {
+    setSearchMode(true);
+    setDetent('half');
+    $('#placeResults').innerHTML = `<p class="place-note">${escapeHtml(text)}</p>`;
   }
 
   function renderSearchResults(places) {
-    const box = $('#searchResults');
+    const box = $('#placeResults');
+    setSearchMode(true);
+    setDetent('half');
     box.innerHTML = '';
 
     if (!places.length) {
-      box.innerHTML = '<div class="search-note">ไม่พบสถานที่ที่ตรงกับคำค้น</div>';
-      box.hidden = false;
+      showPlaceNote('ไม่พบสถานที่ที่ตรงกับคำค้น');
       return;
     }
 
     for (const place of places) {
-      const row = el('div', 'search-result');
-      row.setAttribute('role', 'option');
+      const row = el('div', 'place-row');
       row.innerHTML = `
-        <button class="search-result__main" type="button">
-          <span class="search-result__pin" aria-hidden="true">${window.Icons.get("pin")}</span>
-          <span class="search-result__text">
-            <span class="search-result__name">${escapeHtml(place.name)}</span>
-            ${place.detail ? `<span class="search-result__detail">${escapeHtml(place.detail)}</span>` : ''}
-          </span>
-        </button>
-        <button class="search-result__go" type="button" title="นำทางไปที่นี่">นำทาง</button>`;
+        <span class="place-row__pin" aria-hidden="true">${window.Icons.get('pin')}</span>
+        <span class="place-row__text">
+          <span class="place-row__name">${escapeHtml(place.name)}</span>
+          ${place.detail ? `<span class="place-row__detail">${escapeHtml(place.detail)}</span>` : ''}
+        </span>
+        <button class="place-row__go" type="button">นำทาง</button>`;
 
-      row.querySelector('.search-result__main').addEventListener('click', () => goToPlace(place));
-      row.querySelector('.search-result__go').addEventListener('click', () => {
-        $('#searchInput').value = '';
-        window.Store.setSearch('');
-        hideSearchResults();
-        $('#searchInput').blur();
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.place-row__go')) return;
+        goToPlace(place);
+      });
+      row.querySelector('.place-row__go').addEventListener('click', () => {
+        clearSearch();
         startNavigation({ lng: place.lng, lat: place.lat, label: place.name });
       });
       box.appendChild(row);
     }
-    box.hidden = false;
   }
 
-  function goToPlace(place) {
+  function clearSearch() {
     $('#searchInput').value = '';
     window.Store.setSearch('');
     hideSearchResults();
     $('#searchInput').blur();
+  }
 
+  function goToPlace(place) {
+    clearSearch();
     window.MapView.instance.flyTo({
       center: [place.lng, place.lat],
       zoom: 15.5,
-      pitch: 55,
+      pitch: 0,
       duration: 1200,
     });
     setDetent('peek');
@@ -750,6 +765,7 @@ window.UI = (function () {
 
     async function lookupPlaces(value) {
       const id = ++requestId;
+      showPlaceNote('กำลังค้นหาสถานที่…');
       try {
         const places = await window.Geocode.search(value, origin());
         if (id !== requestId || input.value.trim() !== value.trim()) return;
@@ -757,29 +773,18 @@ window.UI = (function () {
       } catch (_) {
         if (id !== requestId) return;
         // ออฟไลน์หรือ Nominatim ล่ม — ยังกรองรายงานในเครื่องได้ตามปกติ
-        const box = $('#searchResults');
-        box.innerHTML = '<div class="search-note">ค้นหาสถานที่ไม่สำเร็จ — ยังกรองรายงานในรายการได้</div>';
-        box.hidden = false;
+        showPlaceNote('ค้นหาสถานที่ไม่สำเร็จ — ลองใหม่อีกครั้ง');
       }
     }
 
-    // แตะช่องค้นหา = กางรายการเต็มจอให้เลือกได้สะดวก
-    input.addEventListener('focus', () => setDetent('full'));
+    // แตะช่องค้นหา = กางแผ่นขึ้นมาเตรียมแสดงผลค้นหา
+    input.addEventListener('focus', () => setDetent('half'));
 
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        input.value = '';
-        window.Store.setSearch('');
-        hideSearchResults();
-        input.blur();
+        clearSearch();
         setDetent('peek');
       }
-    });
-
-    // แตะที่อื่นแล้วปิดรายการผลลัพธ์
-    document.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('#searchResults') || e.target.closest('.searchbar')) return;
-      hideSearchResults();
     });
   }
 

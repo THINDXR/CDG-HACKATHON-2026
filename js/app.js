@@ -145,8 +145,10 @@
 
   function wireAlerts() {
     window.Alerts.onAlert = (item) => {
+      // แบนเนอร์มีไอคอนอยู่แล้ว ส่วน toast รับได้แค่ข้อความล้วน
+      // (ถ้าใส่ item.def.icon ซึ่งเป็นมาร์กอัป SVG จะกลายเป็นโค้ดโผล่บนจอ)
       window.UI.showAlert(item);
-      window.UI.toast(`${item.def.icon} ${item.message}`, 'warn');
+      window.UI.toast(item.message, 'warn');
     };
     window.Alerts.onNearbyChange = (list) => window.UI.setNearby(list);
 
