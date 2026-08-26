@@ -26,24 +26,9 @@
 <div id="phone" class="phone">
   <div id="map" aria-label="แผนที่สามมิติแสดงจุดเตือนภัย"></div>
 
-  <!-- แถบบนสุด -->
-  <header class="topbar glass">
-    <div class="brand">
-      <div class="brand__mark" data-icon="obstacle"></div>
-      <div class="brand__text">
-        <strong>ยืดอกโหลดแอป</strong>
-        <span>เตือนภัยบนท้องถนน</span>
-      </div>
-    </div>
-
-    <div class="topbar__status">
-      <button id="btnMute" class="icon-btn" type="button" title="เปิด/ปิดเสียงเตือน" aria-label="เสียงเตือน"></button>
-    </div>
-  </header>
-
-  <!-- ค้นหา -->
+  <!-- แถบบน: รวมโลโก้ ช่องค้นหา และปุ่มตำแหน่งไว้แถวเดียว เพื่อคืนพื้นที่ให้แผนที่ -->
   <div class="searchbar glass">
-    <span class="searchbar__icon" id="searchIcon" aria-hidden="true"></span>
+    <span class="searchbar__mark" data-icon="obstacle" aria-hidden="true"></span>
     <input id="searchInput" class="searchbar__input" type="search" autocomplete="off"
            placeholder="ค้นหาถนน หรือสถานที่..." aria-label="ค้นหาถนนหรือสถานที่" />
     <button id="btnTrack" class="searchbar__locate" type="button" title="เริ่ม/หยุดติดตามตำแหน่ง" aria-label="ติดตามตำแหน่ง">
@@ -104,7 +89,6 @@
         <span id="sidebarCount" class="chip-count">0</span>
       </div>
       <button id="btnBack" class="pill-btn" type="button" data-icon="arrowLeft"><span></span>กลับ</button>
-      <button id="btnFilter" class="pill-btn" type="button">กรองข้อมูล</button>
     </div>
 
     <section id="riskPanel" class="risk" aria-live="polite" aria-label="ระดับความเสี่ยงรอบตัว"></section>
@@ -180,6 +164,14 @@
           ระบบจะเตือนเมื่อมีภัยอยู่ในเส้นทางข้างหน้าภายในระยะประมาณ 900 เมตร
           และจะไม่เตือนซ้ำจุดเดิมภายใน 5 นาที
         </p>
+      </div>
+
+      <div class="panel">
+        <h3 class="panel__head">ประเภทภัยที่แสดง</h3>
+        <button class="row-btn" id="btnFilter" type="button">
+          <span class="row-btn__text">เลือกประเภทที่ต้องการเห็นบนแผนที่</span>
+          <span class="row-btn__go" data-icon="chevronRight"></span>
+        </button>
       </div>
 
       <div class="panel">

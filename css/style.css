@@ -28,7 +28,7 @@
   --glow: 0 0 0 1px rgba(255, 138, 31, 0.35), 0 8px 26px rgba(255, 138, 31, 0.22);
   --radius: 18px;
   --radius-sm: 14px;
-  --topbar-h: 56px;
+
   --search-h: 44px;
   --chips-h: 34px;
   --tabbar-h: 62px;
@@ -105,7 +105,8 @@ button:active { transform: scale(0.96); }
   background: var(--bg);
   container: phone / size;
   /* ระยะจากขอบบน ใช้วางแถบต่าง ๆ ที่ซ้อนกันลงมา */
-  --below-topbar: calc(max(12px, calc(var(--safe-t) + 8px)) + var(--topbar-h) + 8px);
+  /* ไม่มีแถบชื่อแอปแล้ว ช่องค้นหาคือแถวบนสุด */
+  --below-topbar: max(12px, calc(var(--safe-t) + 8px));
   --below-search: calc(var(--below-topbar) + var(--search-h) + 8px);
   /* แถบชิปสูงกว่าตัวชิป 14px เพราะมี padding เผื่อเงาไว้บน-ล่าง */
   --below-filters: calc(var(--below-search) + var(--chips-h) + 14px + 8px);
@@ -410,49 +411,6 @@ button:active { transform: scale(0.96); }
   box-shadow: var(--shadow);
 }
 
-/* ---------------- แถบบน ---------------- */
-
-.topbar {
-  position: absolute;
-  top: max(12px, calc(var(--safe-t) + 8px));
-  left: max(12px, var(--safe-l));
-  right: max(12px, var(--safe-r));
-  height: var(--topbar-h);
-  z-index: 20;
-  border-radius: var(--radius);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 14px;
-}
-
-.brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; overflow: hidden; }
-
-.brand__mark {
-  width: 38px;
-  height: 38px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  font-size: 20px;
-  border-radius: 12px;
-  background: linear-gradient(150deg, #ff9f0a, #ff3b30);
-  box-shadow: 0 4px 14px rgba(255, 59, 48, 0.35);
-}
-
-.brand__text { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
-.brand__text strong {
-  font-size: 16px;
-  letter-spacing: -0.2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.brand__text span { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
-
-.topbar__status { display: flex; align-items: center; gap: 8px; flex: none; }
-
 @keyframes livePulse {
   70% { box-shadow: 0 0 0 9px rgba(255, 122, 26, 0); }
   100% { box-shadow: 0 0 0 0 rgba(255, 122, 26, 0); }
@@ -482,12 +440,25 @@ button:active { transform: scale(0.96); }
   z-index: 19;
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 0 6px 0 13px;
-  border-radius: var(--radius);
+  gap: 10px;
+  padding: 0 6px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
 }
 
-.searchbar__icon { font-size: 14px; opacity: 0.75; flex: none; }
+/* โลโก้แอปย้ายมาอยู่หัวช่องค้นหา แทนแถบชื่อแอปเดิมที่กินพื้นที่ทั้งแถว */
+.searchbar__mark {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  border-radius: 10px;
+  background: linear-gradient(150deg, var(--accent-hi), var(--accent));
+  color: #10151c;
+  box-shadow: 0 4px 12px rgba(255, 138, 31, 0.35);
+}
 
 .searchbar__input {
   flex: 1;
@@ -524,77 +495,6 @@ button:active { transform: scale(0.96); }
   color: #10151c;
   box-shadow: 0 0 0 0 rgba(255, 138, 31, 0.6);
   animation: livePulse 1.8s infinite;
-}
-
-.search-results {
-  position: absolute;
-  top: var(--below-search);
-  left: max(12px, var(--safe-l));
-  right: max(12px, var(--safe-r));
-  z-index: 30;
-  max-height: 46cqh;
-  overflow-y: auto;
-  border-radius: var(--radius);
-  padding: 5px;
-}
-
-.search-result {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  border-radius: var(--radius-sm);
-}
-.search-result:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
-
-.search-result__main {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  flex: 1;
-  min-width: 0;
-  padding: 10px;
-  border: 0;
-  background: none;
-  text-align: left;
-  border-radius: var(--radius-sm);
-}
-
-.search-result__go {
-  flex: none;
-  height: 32px;
-  margin-right: 8px;
-  padding: 0 13px;
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.search-result__pin { font-size: 16px; flex: none; }
-.search-result__text { min-width: 0; flex: 1; }
-.search-result__name {
-  font-size: 14px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.search-result__detail {
-  font-size: 11.5px;
-  color: var(--text-dim);
-  margin-top: 1px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.search-note {
-  padding: 12px 12px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-  text-align: center;
 }
 
 /* ---------------- ชิปกรองด่วน ---------------- */
@@ -738,7 +638,7 @@ button:active { transform: scale(0.96); }
 }
 
 /* ขณะนำทาง ซ่อนทุกอย่างที่ไม่เกี่ยวเพื่อให้เหลือแค่ถนนข้างหน้า */
-.phone.is-navigating .topbar,
+
 .phone.is-navigating .searchbar,
 .phone.is-navigating .quickfilters,
 .phone.is-navigating .sidebar,
@@ -954,21 +854,24 @@ button:active { transform: scale(0.96); }
   justify-content: space-between;
   gap: 8px;
 }
-.risk__title { font-size: 12.5px; font-weight: 600; color: var(--text-dim); }
+/* ระดับความเสี่ยงเป็นตัวเด่นของการ์ด ไม่ต้องมีหัวข้อกำกับอีกชั้น */
 .risk__level {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 999px;
-  color: #fff;
-  background: var(--risk-color);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--risk-color);
+  letter-spacing: -0.2px;
 }
-/* พื้นเขียว/เหลืองสว่าง ตัวอักษรขาวอ่านไม่ออก จึงสลับเป็นตัวอักษรเข้ม */
-.risk[data-level='low'] .risk__level,
-.risk[data-level='medium'] .risk__level { color: #0b0f18; }
+.risk__score {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--risk-color);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+.risk__score small { font-size: 11px; font-weight: 600; opacity: 0.65; }
 
 .risk__meter {
-  height: 7px;
+  height: 8px;
   margin: 9px 0 8px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--text) 12%, transparent);
@@ -981,28 +884,15 @@ button:active { transform: scale(0.96); }
     color-mix(in srgb, var(--risk-color) 55%, white), var(--risk-color));
   transition: width 0.4s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
-.risk__level { font-variant-numeric: tabular-nums; }
 
-.risk__stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  text-align: center;
+/* สรุปตัวเลขบรรทัดเดียว แทนตาราง 3 ช่องเดิมที่อ่านแล้วสับสน */
+.risk__summary {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
 }
-.risk__stats div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.risk__stats strong { font-size: 14px; }
-.risk__stats span { font-size: 10.5px; color: var(--text-dim); line-height: 1.3; }
-
-.risk__advice {
-  margin: 8px 0 0;
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: #a8b0c2;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+.risk__summary strong { color: var(--text); font-weight: 800; }
 
 /* ---------------- ตัวกรองแบบเต็มในแผ่นซ้อน ---------------- */
 
@@ -1865,10 +1755,10 @@ body.picking .phone > #map::after {
 /* ---------------- ขนาดจอ iPhone (พอร์ตเทรต) ---------------- */
 
 @container phone (max-width: 480px) {
-  .topbar { padding: 0 10px; gap: 8px; }
-  .brand__mark { width: 34px; height: 34px; font-size: 17px; }
-  .brand__text strong { font-size: 15px; }
-  .topbar__status { gap: 6px; }
+
+
+
+
 
   .type-card { font-size: 11px; }
   .type-card__icon { width: 58px; height: 58px; font-size: 25px; }
@@ -1876,19 +1766,11 @@ body.picking .phone > #map::after {
   .alert-banner { width: calc(100cqw - max(24px, calc(var(--safe-l) + var(--safe-r) + 16px))); }
   }
 
-/* จอแคบ (iPhone SE / mini) — ย่อปุ่มลงเพื่อให้ชื่อแอปยังอยู่ครบ */
+/* จอแคบ (iPhone SE / mini) — ย่อองค์ประกอบลงเล็กน้อย */
 @container phone (max-width: 385px) {
-  .topbar { padding: 0 8px; gap: 6px; }
-  .topbar__status { gap: 5px; }
   .icon-btn { width: 38px; height: 38px; font-size: 14px; }
-  .brand { gap: 8px; }
-  .brand__mark { width: 34px; height: 34px; font-size: 17px; }
-  .brand__text strong { font-size: 14.5px; }
-}
-
-/* แคบมากจริง ๆ — ยอมซ่อนชื่อแอป เหลือโลโก้ */
-@container phone (max-width: 330px) {
-  .brand__text { display: none; }
+  .searchbar { gap: 8px; }
+  .searchbar__input { font-size: 15px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1900,7 +1782,6 @@ body.picking .phone > #map::after {
 /* ไอคอนบนพื้นสีเข้ม/สีสด ใช้สีขาวเพื่อให้ตัดกับพื้นหลัง */
 .hazard-marker__pin,
 .type-card__icon,
-.brand__mark,
 .event__icon,
 .hazard-item__icon,
 .detail-card__icon,
@@ -1918,7 +1799,7 @@ body.picking .phone > #map::after {
 
 .factor__icon { color: var(--text-dim); }
 .searchbar__icon { color: var(--text-dim); }
-.search-result__pin { color: var(--accent); }
+
 .hazard-item__go { color: var(--text-dim); }
 .alert-banner__icon { color: #fff; }
 .filter-row__check .icon { width: .8em; height: .8em; }
@@ -2146,3 +2027,19 @@ body.picking .phone > #map::after {
   font-weight: 800;
 }
 .place-note { padding: 22px 12px; text-align: center; font-size: 12.5px; color: var(--text-dim); }
+
+/* ---------------- แถวกดได้ในหน้าตั้งค่า ---------------- */
+
+.row-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 2px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+.row-btn__text { flex: 1; font-size: 14px; }
+.row-btn__go { color: var(--text-dim); font-size: 17px; display: grid; place-items: center; }

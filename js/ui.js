@@ -166,28 +166,29 @@ window.UI = (function () {
     box.dataset.level = risk.level.key;
 
 
-    const dominant = risk.dominantType ? CFG.HAZARD_TYPES[risk.dominantType] : null;
     const nearestText = risk.nearest && risk.nearest.distance != null
       ? U.formatDistance(risk.nearest.distance)
       : '—';
 
+    /*
+     * เหลือเฉพาะสิ่งที่ผู้ขับต้องรู้จริง ๆ: ระดับความเสี่ยง แถบวัด
+     * และสรุปตัวเลขบรรทัดเดียว — ตัดตาราง 3 ช่องกับย่อหน้าคำแนะนำยาว ๆ ออก
+     */
     box.innerHTML = `
       <div class="risk__head">
-        <span class="risk__title">ความเสี่ยงรอบตัว</span>
-        <span class="risk__level">${escapeHtml(risk.level.label)} · ${risk.score}</span>
+        <span class="risk__level">${escapeHtml(risk.level.label)}</span>
+        <span class="risk__score">${risk.score}<small>/100</small></span>
       </div>
       <div class="risk__meter" role="meter" aria-valuenow="${risk.score}"
            aria-valuemin="0" aria-valuemax="100"
            aria-label="คะแนนความเสี่ยง ${risk.score} จาก 100">
         <div class="risk__bar" style="width:${Math.max(risk.score, 2)}%"></div>
       </div>
-      <div class="risk__stats">
-        <div><strong>${risk.count}</strong><span>จุดใกล้เคียง</span></div>
-        <div><strong>${risk.high}</strong><span>อันตราย</span></div>
-        <div><strong>${escapeHtml(nearestText)}</strong><span>ใกล้ที่สุด</span></div>
-      </div>
-      <p class="risk__advice">
-        ${dominant ? `${dominant.icon} ส่วนใหญ่เป็น${escapeHtml(dominant.label)} — ` : ''}${escapeHtml(risk.level.advice)}${known ? '' : ' (คิดจากกลางจอแผนที่)'}
+      <p class="risk__summary">
+        <strong>${risk.count}</strong> จุดใกล้เคียง
+        ${risk.high ? ` · <strong>${risk.high}</strong> อันตราย` : ''}
+        ${risk.nearest ? ` · ใกล้สุด <strong>${escapeHtml(nearestText)}</strong>` : ''}
+        ${known ? '' : ' · คิดจากกลางจอ'}
       </p>`;
   }
 
@@ -883,10 +884,6 @@ window.UI = (function () {
     const tracking = window.Alerts.isTracking || s.simulating;
     $('#btnTrack').classList.toggle('is-live', tracking);
     $('#btnTrack').title = tracking ? 'กำลังติดตามตำแหน่ง' : 'ติดตามตำแหน่งของฉัน';
-
-    const muted = !window.Alerts.settings.sound;
-    $('#btnMute').innerHTML = window.Icons.get(muted ? 'bellOff' : 'bell');
-    $('#btnMute').title = muted ? 'เปิดเสียงเตือน' : 'ปิดเสียงเตือน';
   }
 
   function setNearby(list) {
@@ -971,15 +968,6 @@ window.UI = (function () {
     });
     $('#setVoice').addEventListener('change', (e) => window.Alerts.setSetting('voice', e.target.checked));
     $('#setVibrate').addEventListener('change', (e) => window.Alerts.setSetting('vibrate', e.target.checked));
-
-    // กระดิ่งบนแถบบน = ปิด/เปิดเสียงเตือนอย่างเร็ว
-    $('#btnMute').addEventListener('click', () => {
-      const next = !window.Alerts.settings.sound;
-      window.Alerts.setSetting('sound', next);
-      if (next) window.Alerts.ensureAudio();
-      syncStatusButtons();
-      toast(next ? 'เปิดเสียงเตือนแล้ว' : 'ปิดเสียงเตือนแล้ว');
-    });
 
     $('#alertClose').addEventListener('click', hideAlert);
     $('#btnStopNav').addEventListener('click', () => {
