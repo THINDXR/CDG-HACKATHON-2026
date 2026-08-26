@@ -70,6 +70,20 @@ window.UI = (function () {
     });
   }
 
+  /* ---------- ที่มาของรายงาน ---------- */
+
+  /**
+   * ป้ายบอกว่ารายงานมาจากคนแจ้ง หรือเป็นจุดที่ระบบคาดการณ์ไว้เอง
+   * ทั้งสองแบบใช้ไอคอนและสีคนละชุด เพื่อให้แยกออกตั้งแต่แรกเห็น
+   */
+  function sourceTag(report) {
+    const predicted = (report.source || 'user') === 'predicted';
+    return `<span class="src-tag src-tag--${predicted ? 'predicted' : 'user'}">
+        ${window.Icons.get(predicted ? 'spark' : 'person')}
+        ${predicted ? 'ระบบคาดการณ์' : 'ผู้ใช้แจ้ง'}
+      </span>`;
+  }
+
   /* ---------- รายการภัย ---------- */
 
   function origin() {
@@ -114,6 +128,7 @@ window.UI = (function () {
           <div class="hazard-item__top">
             <strong>${escapeHtml(def.label)}</strong>
             <span class="sev sev--${item.severity}">${escapeHtml(sev.label)}</span>
+            ${sourceTag(item)}
           </div>
           <div class="hazard-item__road">${escapeHtml(item.road)}</div>
           <div class="hazard-item__meta">
@@ -204,6 +219,7 @@ window.UI = (function () {
           <strong>${escapeHtml(def.label)}</strong>
           <div class="detail-card__sub">
             <span class="sev sev--${report.severity}">${escapeHtml(sev.label)}</span>
+            ${sourceTag(report)}
           </div>
         </div>
       </div>
@@ -258,7 +274,13 @@ window.UI = (function () {
       window.Store.setFollowing(true);
       setDetent('closed');
       window.MapView.setNavRoute(route.coordinates);
+      // โชว์เส้นทางทั้งเส้นให้เห็นภาพรวมก่อน แล้วค่อยซูมกลับเข้ามาที่ตัวผู้ใช้
       window.MapView.fitRoute(route.coordinates);
+      setTimeout(() => {
+        if (!window.Navigate.isActive) return;
+        const pos = window.Store.state.userPosition || from;
+        window.MapView.navCamera(pos, window.Store.state.userHeading);
+      }, 1600);
       renderNav();
 
       if (!window.Store.state.userPosition) {
@@ -267,6 +289,30 @@ window.UI = (function () {
     } catch (err) {
       toast(err.message || 'หาเส้นทางไม่สำเร็จ', 'warn');
     }
+  }
+
+  /**
+   * พากล้องกลับไปที่หัวลูกศรของผู้ใช้ — ใช้ร่วมกันทั้งหน้าแผนที่และหน้านำทาง
+   * ถ้ายังไม่รู้ตำแหน่ง จะเริ่มติดตามตำแหน่งให้เลย
+   */
+  function goToMyLocation() {
+    const s = window.Store.state;
+
+    if (!s.userPosition) {
+      toast('กำลังหาตำแหน่งของคุณ…');
+      $('#btnTrack').click();
+      return;
+    }
+
+    setView('map');
+    window.Store.setFollowing(true);
+
+    if (window.Navigate.isActive) {
+      window.MapView.navCamera(s.userPosition, s.userHeading);
+    } else {
+      window.MapView.followUser(s.userPosition, s.userHeading);
+    }
+    renderNav();
   }
 
   function stopNavigation() {
@@ -312,7 +358,8 @@ window.UI = (function () {
     banner.hidden = false;
     banner.dataset.severity = report.severity;
     banner.style.setProperty('--alert-color', def.color);
-    $('#alertIcon').textContent = def.icon;
+    // def.icon เป็นมาร์กอัป SVG แล้ว ถ้าใช้ textContent จะโชว์เป็นโค้ดดิบบนหน้าจอ
+    $('#alertIcon').innerHTML = def.icon;
     $('#alertTitle').textContent = message;
     $('#alertMeta').textContent = `${report.road}${report.note ? ' · ' + report.note : ''}`;
     banner.classList.remove('is-in');
@@ -754,6 +801,12 @@ window.UI = (function () {
       '--sheet-shift',
       name === 'closed' ? 'calc(100% + 16px)' : `${DETENTS[name]}%`
     );
+
+    // ปิดแผ่นแล้วต้องมีทางเรียกกลับ — โชว์แถบเตี้ยไว้เหนือแท็บบาร์
+    // (ซ่อนตอนนำทางเพราะมีการ์ดนำทางกับแถบสรุปอยู่แล้ว)
+    const peek = $('#sheetPeek');
+    peek.hidden = name !== 'closed' || window.Navigate.isActive || currentView !== 'map';
+    $('#sheetPeekCount').textContent = $('#sidebarCount').textContent;
   }
 
   function nearestDetent(pct) {
@@ -929,12 +982,10 @@ window.UI = (function () {
       toast('จบการนำทางแล้ว');
     });
 
-    $('#btnRecenter').addEventListener('click', () => {
-      const s = window.Store.state;
-      window.Store.setFollowing(true);
-      if (s.userPosition) window.MapView.navCamera(s.userPosition, s.userHeading);
-      renderNav();
-    });
+    $('#btnRecenter').addEventListener('click', goToMyLocation);
+
+    // กดหรือปัดขึ้นที่แถบเตี้ย = เปิดแผ่นความปลอดภัยกลับมา
+    $('#sheetPeek').addEventListener('click', () => setDetent('peek'));
     bindSheetDrag();
     setDetent('peek');
     setView('map');
@@ -959,6 +1010,7 @@ window.UI = (function () {
     syncSettings,
     startNavigation,
     stopNavigation,
+    goToMyLocation,
     showDetailSheet: collapseToMap,
     renderFilters,
     renderFilterSheet,

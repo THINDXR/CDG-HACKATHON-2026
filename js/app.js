@@ -189,6 +189,14 @@
   function wireMapControls() {
     $('#btnZoomIn').addEventListener('click', () => window.MapView.zoomBy(1));
     $('#btnZoomOut').addEventListener('click', () => window.MapView.zoomBy(-1));
+
+    // ปุ่มพากลับไปที่หัวลูกศรของเรา ใช้ได้ทั้งหน้าแผนที่และระหว่างนำทาง
+    $('#btnMyLocation').addEventListener('click', () => window.UI.goToMyLocation());
+
+    $('#btnCompass').addEventListener('click', () => {
+      window.MapView.resetNorth();
+      window.UI.toast('หันกลับไปทางทิศเหนือแล้ว');
+    });
   }
 
   if (document.readyState === 'loading') {

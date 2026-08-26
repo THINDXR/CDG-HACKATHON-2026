@@ -462,8 +462,16 @@ window.MapView = (function () {
         geometry: U.circlePolygon([r.lng, r.lat], r.radius),
       })),
     };
-    const src = map.isStyleLoaded() && map.getSource('hazard-zones');
-    if (src) src.setData(zones);
+    // ต้องอัปเดตทุกครั้งที่ source มีอยู่ ไม่ผูกกับ isStyleLoaded()
+    // ไม่งั้นตอนลบรายงานแล้วสไตล์ยังโหลดไม่นิ่ง วงรัศมีของจุดที่ลบไปจะค้างบนแผนที่
+    const src = map.getSource('hazard-zones');
+    if (src) {
+      try {
+        src.setData(zones);
+      } catch (_) {
+        // สไตล์กำลังสลับอยู่ — เดี๋ยว style.load จะเรียก refreshHazards ให้เอง
+      }
+    }
 
     updateMarkerView();
   }
@@ -537,12 +545,24 @@ window.MapView = (function () {
     const wrap = U.el('div', 'hazard-marker');
     wrap.style.setProperty('--pin-color', def.color);
     wrap.dataset.id = report.id;
+    // แยกให้เห็นชัดว่าเป็นรายงานจากคน หรือจุดที่ระบบคาดการณ์ไว้
+    wrap.dataset.source = report.source || 'user';
 
     const pin = U.el('div', 'hazard-marker__pin');
-    pin.appendChild(U.el('span', 'hazard-marker__icon', def.icon));
-    const shadow = U.el('div', 'hazard-marker__shadow');
+    // def.icon เป็นมาร์กอัป SVG ต้องใช้ innerHTML ไม่ใช่ U.el(...) ที่ตั้ง textContent
+    // ไม่งั้นหมุดจะกลายเป็นข้อความ "<svg class=..." กองอยู่บนแผนที่
+    const icon = U.el('span', 'hazard-marker__icon');
+    icon.innerHTML = def.icon;
+    pin.appendChild(icon);
 
-    // ป้ายทรงใหม่มีหางในตัวแล้ว ไม่ต้องมีก้าน (เหลือจากหมุดทรงหยดน้ำเดิม)
+    // ป้ายบอกที่มา: คนแจ้งเอง vs ระบบคาดการณ์
+    const badge = U.el('span', 'hazard-marker__badge');
+    badge.innerHTML = window.Icons.get(
+      (report.source || 'user') === 'predicted' ? 'spark' : 'person'
+    );
+    pin.appendChild(badge);
+
+    const shadow = U.el('div', 'hazard-marker__shadow');
     wrap.append(pin, shadow);
     wrap.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -654,9 +674,10 @@ window.MapView = (function () {
     if (!map || !coord) return;
     map.easeTo({
       center: coord,
-      bearing: typeof heading === 'number' ? heading : map.getBearing(),
-      pitch: Math.max(map.getPitch(), 60),
-      zoom: Math.max(map.getZoom(), 16.5),
+      // นอกโหมดนำทางให้คงทิศเหนือไว้ ไม่หมุนแผนที่ตามรถ อ่านง่ายกว่า
+      bearing: 0,
+      pitch: 0, // มุมมอง 2 มิติเสมอ
+      zoom: Math.max(map.getZoom(), 16),
       duration: 900,
       easing: (t) => t * (2 - t),
     });
@@ -691,8 +712,21 @@ window.MapView = (function () {
     map.easeTo({ zoom: map.getZoom() + delta, duration: 300 });
   }
 
-  // มุมมองเป็น 2 มิติ หันทิศเหนือเสมอ จึงไม่มีเข็มทิศให้อัปเดตแล้ว
-  function updateCompass() {}
+  /**
+   * เข็มทิศจะโผล่เฉพาะตอนแผนที่ถูกหมุนออกจากทิศเหนือ (เช่นระหว่างนำทาง)
+   * เข็มหมุนสวนทางกับแผนที่ เพื่อให้ยังชี้ทิศเหนือจริงเสมอ
+   */
+  function updateCompass() {
+    if (!map) return;
+    const btn = document.getElementById('btnCompass');
+    if (!btn) return;
+
+    const bearing = map.getBearing();
+    btn.hidden = Math.abs(bearing) < 1;
+
+    const needle = btn.querySelector('.map-btn__needle');
+    if (needle) needle.style.transform = `rotate(${-bearing}deg)`;
+  }
 
   /* ---------- โหมดสไตล์ ---------- */
 

@@ -12,15 +12,20 @@
   --border: rgba(255, 255, 255, 0.08);
   --text: #f5f7fa;
   --text-dim: #8a92a3;
-  --accent: #ffc233;          /* เหลืองสด — แท็บที่เลือก ปุ่มหลัก */
-  --accent-2: #ff7a1a;        /* ส้ม — ไฮไลต์รอง */
-  --accent-soft: rgba(255, 194, 51, 0.16);
+  /* ส้มเป็นสีหลัก ตัดด้วยฟ้าสำหรับเส้นทางและข้อมูลที่ระบบคาดการณ์ */
+  --accent: #ff8a1f;          /* ส้มสด — แท็บที่เลือก ปุ่มหลัก */
+  --accent-hi: #ffb45c;       /* ส้มอ่อน — ไล่เฉดและขอบเรือง */
+  --accent-2: #38bdf8;        /* ฟ้า — เส้นทางนำทาง และจุดที่ระบบคาดการณ์ */
+  --accent-soft: rgba(255, 138, 31, 0.16);
+  --accent-2-soft: rgba(56, 189, 248, 0.16);
   --danger: #ff4d4f;
-  --warn: #ff9f0a;
+  --warn: #ffb020;
   --ok: #22c55e;
-  --route: #8b5cf6;
+  --route: #ff8a1f;
   --shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
   --shadow-sm: 0 3px 14px rgba(0, 0, 0, 0.45);
+  /* ขอบเรืองใช้กับการ์ด/ปุ่มหลัก ให้ดูมีมิติกว่าขอบเส้นเดียว */
+  --glow: 0 0 0 1px rgba(255, 138, 31, 0.35), 0 8px 26px rgba(255, 138, 31, 0.22);
   --radius: 18px;
   --radius-sm: 14px;
   --topbar-h: 56px;
@@ -57,7 +62,7 @@ html, body {
   overscroll-behavior: none;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Noto Sans Thai',
+  font-family: 'Noto Sans Thai', Roboto, -apple-system, BlinkMacSystemFont,
     'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
@@ -206,12 +211,12 @@ button:active { transform: scale(0.96); }
   transition: background 0.18s ease, transform 0.18s ease;
 }
 
-/* แท็บที่เลือกอยู่ = วงกลมเหลืองเด่น ตามดีไซน์ */
+/* แท็บที่เลือกอยู่ = วงกลมส้มไล่เฉด ยกตัวขึ้นพร้อมเงาเรือง */
 .tab.is-active { color: var(--text); }
 .tab.is-active .tab__icon {
-  background: var(--accent);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(255, 194, 51, 0.4);
+  background: linear-gradient(150deg, var(--accent-hi), var(--accent));
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(255, 138, 31, 0.45);
 }
 
 /* ---------------- หน้าจอแบบเต็ม (แดชบอร์ด / ตั้งค่า) ---------------- */
@@ -695,7 +700,7 @@ button:active { transform: scale(0.96); }
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 12px 12px 12px 16px;
+  padding: 14px 12px 14px 16px;
   border-radius: 22px;
   background: var(--surface-solid);
   border: 1px solid var(--border);
@@ -713,8 +718,8 @@ button:active { transform: scale(0.96); }
   gap: 1px;
   min-width: 0;
 }
-.nav-bar__stat strong { font-size: 16px; letter-spacing: -0.2px; }
-.nav-bar__stat span { font-size: 10.5px; color: var(--text-dim); }
+.nav-bar__stat strong { font-size: 21px; letter-spacing: -0.4px; }
+.nav-bar__stat span { font-size: 11px; color: var(--text-dim); }
 
 .nav-bar__stop {
   flex: none;
@@ -1573,7 +1578,8 @@ button:active { transform: scale(0.96); }
   transform: translateX(-50%) scale(calc(var(--marker-scale, 1) * var(--pin-scale, 1)));
   transform-origin: bottom center;
   transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1);
-  border-radius: 14px;
+  /* ทรงกลมแบบฟองสนทนา ให้ความรู้สึกเดียวกับหมุดของ Waze */
+  border-radius: 50%;
   background: linear-gradient(155deg,
     color-mix(in srgb, var(--pin-color) 82%, white),
     var(--pin-color));
@@ -1788,7 +1794,12 @@ body.picking .phone > #map::after {
   .hazard-item { padding: 12px 10px; }
   .hazard-item__icon { width: 40px; height: 40px; font-size: 19px; }
 
-  .map-controls { top: auto; bottom: max(88px, calc(var(--safe-b) + 76px)); right: max(12px, var(--safe-r)); }
+  /* ปิดแผ่นแล้วยังมีแท็บบาร์กับแถบดึงแผ่นอยู่ด้านล่าง ต้องเผื่อความสูงทั้งสองอัน */
+  .map-controls {
+    top: auto;
+    bottom: calc(var(--tabbar-h) + var(--safe-b) + 64px);
+    right: max(12px, var(--safe-r));
+  }
   .map-btn { width: 46px; height: 46px; font-size: 16px; }
   .toasts { bottom: max(150px, calc(var(--safe-b) + 138px)); }
 
@@ -1898,3 +1909,133 @@ body.picking .phone > #map::after {
 .hazard-item__go { color: var(--text-dim); }
 .alert-banner__icon { color: #fff; }
 .filter-row__check .icon { width: .8em; height: .8em; }
+
+/* ---------------- ปรับโทนให้ใกล้ Waze ---------------- */
+
+/* แท็บแจ้งเหตุใช้สีส้มให้เด่นแยกจากแท็บอื่น เหมือนปุ่มรายงานของ Waze */
+#tabReport.is-active .tab__icon {
+  background: var(--accent-2);
+  box-shadow: 0 6px 18px rgba(255, 159, 10, 0.4);
+}
+#tabReport .tab__icon { color: var(--accent-2); }
+#tabReport.is-active .tab__icon { color: #10151c; }
+
+/* ไอคอนในวงกลมของแท็บที่เลือก ใช้สีเข้มเพื่อให้ตัดกับพื้นสด */
+.tab.is-active .tab__icon { color: #10151c; }
+
+/* ปุ่มไปที่ตำแหน่งตัวเอง — แยกสีให้เห็นชัดว่าเป็นปุ่มหลักของแผนที่ */
+.map-btn--locate {
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+}
+.map-btn--locate.is-live { color: #10151c; background: var(--accent); }
+
+/* ตัวเลขและหัวข้อหนาแบบ Waze */
+.nav-card__body strong,
+.gauge__center strong,
+.nav-bar__stat strong { font-weight: 900; letter-spacing: -0.5px; }
+.panel__title, .panel__head, .sheet__head h2 { font-weight: 700; }
+
+/* ---------------- แยกที่มาของรายงาน: คนแจ้ง vs ระบบคาดการณ์ ---------------- */
+
+/* ป้ายเล็กมุมขวาบนของหมุด บอกว่ามาจากไหน */
+.hazard-marker__badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  border-radius: 50%;
+  background: #10151c;
+  color: #fff;
+  border: 2px solid #10151c;
+}
+.hazard-marker[data-source='predicted'] .hazard-marker__badge {
+  background: var(--accent-2);
+  color: #08131b;
+}
+
+/* จุดที่ระบบคาดการณ์ใช้ขอบประ ให้ต่างจากรายงานจริงตั้งแต่แรกเห็น */
+.hazard-marker[data-source='predicted'] .hazard-marker__pin {
+  border-style: dashed;
+  border-width: 2px;
+  border-color: rgba(255, 255, 255, 0.85);
+  opacity: 0.92;
+}
+
+/* ป้ายกำกับในรายการและหน้ารายละเอียด */
+.src-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  flex: none;
+}
+.src-tag--user {
+  background: var(--accent-soft);
+  color: var(--accent-hi);
+  border: 1px solid rgba(255, 138, 31, 0.35);
+}
+.src-tag--predicted {
+  background: var(--accent-2-soft);
+  color: var(--accent-2);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+.src-tag .icon { width: .85em; height: .85em; }
+
+/* ---------------- แถบดึงแผ่นกลับขึ้นมา ---------------- */
+
+/*
+ * ปัดแผ่นความปลอดภัยลงจนสุดแล้วมันหายไปเลย ไม่มีทางเรียกกลับ
+ * จึงเหลือแถบเตี้ย ๆ ไว้เหนือแท็บบาร์ให้กดหรือปัดขึ้นเพื่อเปิดใหม่
+ */
+.sheet-peek {
+  position: absolute;
+  left: max(10px, var(--safe-l));
+  right: max(10px, var(--safe-r));
+  bottom: calc(var(--tabbar-h) + var(--safe-b) + 8px);
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  animation: navBarIn 0.24s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.sheet-peek__grip {
+  width: 26px;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text) 30%, transparent);
+  flex: none;
+}
+.sheet-peek__text { flex: 1; text-align: left; font-size: 13.5px; font-weight: 700; }
+.sheet-peek__count {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #10151c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* เข็มทิศ — เข็มหมุนสวนทางแผนที่ให้ชี้เหนือเสมอ */
+.map-btn--compass { color: var(--danger); }
+.map-btn__needle { display: grid; place-items: center; transition: transform 0.15s ease-out; }
