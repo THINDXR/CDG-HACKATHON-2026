@@ -598,6 +598,13 @@ button:active { transform: scale(0.96); }
   pointer-events: none;
   transition: opacity 0.25s ease;
 }
+
+/*
+ * หน้าแดชบอร์ด/ตั้งค่าเป็นแผงทึบคลุมทั้งจอ ถ้าเผลอค้างไว้ระหว่างนำทาง
+ * การ์ดนำทางจะไปลอยทับรายการตั้งค่าแทนที่จะอยู่บนแผนที่
+ * ตัวสลับแท็บใน startNavigation จัดการให้อยู่แล้ว อันนี้กันไว้อีกชั้น
+ */
+.phone.is-navigating .view { display: none; }
 .phone.is-navigating .map-controls {
   top: auto;
   bottom: calc(var(--safe-b) + 84px);
