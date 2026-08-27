@@ -151,10 +151,23 @@ window.Store = (function () {
 
   /* ---------- selectors ---------- */
 
+  /*
+   * ระหว่างนำทาง เก็บ id ของจุดเสี่ยงที่อยู่บนเส้นทางไว้ที่นี่
+   * เพื่อให้แผนที่โชว์เฉพาะจุดที่จะวิ่งผ่านจริง ไม่ใช่จุดทั้งเมืองที่ไม่เกี่ยวกับเส้นทาง
+   * null = ไม่จำกัด (นอกโหมดนำทาง)
+   */
+  let routeOnly = null;
+
+  function setRouteFilter(ids) {
+    routeOnly = ids ? new Set(ids) : null;
+    emit('filter');
+  }
+
   /** รายงานที่ผ่านทั้งตัวกรองประเภทและคำค้น (ใช้ทั้งรายการและหมุดบนแผนที่) */
   function visibleReports() {
     const q = state.search.trim().toLowerCase();
     return state.reports.filter((r) => {
+      if (routeOnly && !routeOnly.has(r.id)) return false;
       if (!state.activeTypes.has(r.type)) return false;
       if (!q) return true;
       const label = CFG.HAZARD_TYPES[r.type].label;
@@ -363,6 +376,7 @@ window.Store = (function () {
     toggleType,
     setAllTypes,
     setOnlyType,
+    setRouteFilter,
     countsByType,
     setSearch,
     select,
