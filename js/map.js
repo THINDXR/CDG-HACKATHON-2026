@@ -615,7 +615,8 @@ window.MapView = (function () {
     // พื้นทึบไม่มีถนนให้ดู จึงย่อได้มากกว่าเพื่อให้เห็นจุดแจ้งเหตุครบ ๆ
     const minZoom = styleMode === 'plain' ? 11.5 : 13.5;
     const zoom = Math.max(minZoom, Math.min(15.2, camera.zoom));
-    // มุมมอง 2 มิติ หันทิศเหนือเสมอ
+    // ดูภาพรวมทั้งเมืองต้องหันทิศเหนือ ถึงจะอ่านแผนที่ได้ตามปกติ
+    headingUp = false;
     map.easeTo({
       center: camera.center,
       zoom,
@@ -719,12 +720,27 @@ window.MapView = (function () {
     updateMarkerView();
   }
 
-  function followUser(coord, heading) {
+  /*
+   * นอกโหมดนำทาง แผนที่จะหันทิศไหน มีสองแบบให้เลือก
+   *
+   *  - หันตามหัวลูกศร (headingUp) — เปิดเมื่อผู้ใช้กดปุ่มตำแหน่งของฉัน
+   *    ลูกศรจะชี้ตรงขึ้นเสมอ ขนานกับถนนที่กำลังมุ่งหน้าไป
+   *  - หันทิศเหนือ — กดปุ่มเข็มทิศเพื่อกลับมาโหมดนี้ อ่านชื่อถนนง่ายกว่า
+   *
+   * ระหว่างที่ตามตำแหน่งอยู่ต้องจำโหมดไว้ ไม่งั้นพอ GPS ขยับครั้งถัดไป
+   * กล้องจะเด้งกลับไปทิศเดิมทันทีที่ผู้ใช้เพิ่งสั่งให้หัน
+   */
+  let headingUp = false;
+
+  function followUser(coord, heading, opts = {}) {
     if (!map || !coord) return;
+    if (typeof opts.headingUp === 'boolean') headingUp = opts.headingUp;
+
+    const aligned = headingUp && typeof heading === 'number' && !Number.isNaN(heading);
+
     map.easeTo({
       center: coord,
-      // นอกโหมดนำทางให้คงทิศเหนือไว้ ไม่หมุนแผนที่ตามรถ อ่านง่ายกว่า
-      bearing: 0,
+      bearing: aligned ? heading : map.getBearing(),
       pitch: 0, // มุมมอง 2 มิติเสมอ
       zoom: Math.max(map.getZoom(), 16),
       // เล็งกลางพื้นที่ที่มองเห็น ไม่ใช่กลางจอ ไม่งั้นลูกศรไปอยู่หลังแผ่นความปลอดภัย
@@ -758,6 +774,8 @@ window.MapView = (function () {
   }
 
   function resetNorth() {
+    // กดเข็มทิศ = เลิกหันตามหัวลูกศร ไม่งั้น GPS ขยับทีเดียวก็หมุนกลับไปอีก
+    headingUp = false;
     map.easeTo({ bearing: 0, duration: 600 });
   }
 

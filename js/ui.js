@@ -392,7 +392,9 @@ window.UI = (function () {
     if (window.Navigate.isActive) {
       window.MapView.navCamera(s.userPosition, s.userHeading, true);
     } else {
-      window.MapView.followUser(s.userPosition, s.userHeading);
+      // กดปุ่มตำแหน่งของฉัน = หันแผนที่ให้ขนานกับหัวลูกศร (ลูกศรชี้ตรงขึ้น)
+      // อยากกลับไปทิศเหนือก็กดปุ่มเข็มทิศที่โผล่ขึ้นมาข้าง ๆ
+      window.MapView.followUser(s.userPosition, s.userHeading, { headingUp: true });
     }
     renderNav();
   }
