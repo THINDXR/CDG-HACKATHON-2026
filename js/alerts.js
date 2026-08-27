@@ -47,10 +47,23 @@ window.Alerts = (function () {
     stopSimulation();
     if (watchId != null) navigator.geolocation.clearWatch(watchId);
 
+    let lastCoord = null;
+
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const coord = [pos.coords.longitude, pos.coords.latitude];
-        const heading = Number.isFinite(pos.coords.heading) ? pos.coords.heading : undefined;
+        let heading = Number.isFinite(pos.coords.heading) ? pos.coords.heading : undefined;
+
+        /*
+         * เบราว์เซอร์มักคืน heading เป็น null ตอนอยู่นิ่งหรือขยับช้า
+         * ถ้าไม่มีค่า แผนที่ตอนนำทางจะไม่หมุนตามทิศเลย
+         * จึงคำนวณเองจากตำแหน่งก่อนหน้า (ใช้เฉพาะเมื่อขยับพอสมควรกัน GPS แกว่ง)
+         */
+        if (heading === undefined && lastCoord && U.distance(lastCoord, coord) > 8) {
+          heading = U.bearing(lastCoord, coord);
+        }
+        if (!lastCoord || U.distance(lastCoord, coord) > 8) lastCoord = coord;
+
         window.Store.setUserPosition(coord, heading);
       },
       (err) => {

@@ -395,18 +395,36 @@ window.MapView = (function () {
     );
   }
 
-  /** มุมกล้องแบบนำทาง: ซูมใกล้ มองจากด้านบน และหันไปตามทิศที่รถวิ่ง */
-  function navCamera(coord, heading) {
+  /**
+   * มุมกล้องแบบนำทาง: หันจอไปตามทิศที่รถวิ่ง เพื่อให้ "ขึ้นบนจอ = ข้างหน้ารถ"
+   *
+   * ตำแหน่งอัปเดตถี่กว่าความยาวอนิเมชัน ถ้าใช้ easeTo ยาว ๆ ทุกครั้ง
+   * กล้องจะถูกสั่งใหม่ก่อนหมุนถึงเป้า ทำให้ bearing ตามหลัง heading ตลอด
+   * และหัวลูกศรจะเอียงไม่ตรงกับทิศจอ จึงใช้อนิเมชันสั้นให้ไล่ทัน
+   *
+   * @param {boolean} [snap] true = เข้าโหมดนำทางครั้งแรก ให้จัดซูม/มุมทีเดียว
+   */
+  function navCamera(coord, heading, snap = false) {
     if (!map || !coord) return;
-    map.easeTo({
+
+    const target = typeof heading === 'number' ? heading : map.getBearing();
+    const camera = {
       center: coord,
-      zoom: 17,
-      pitch: 0,
-      bearing: typeof heading === 'number' ? heading : map.getBearing(),
-      duration: 700,
+      bearing: target,
       // เลื่อนจุดศูนย์กลางลงล่าง ให้เห็นถนนข้างหน้ามากกว่าข้างหลัง
       padding: { top: 240, bottom: 0, left: 0, right: 0 },
-    });
+    };
+
+    if (snap) {
+      // ครั้งแรกค่อยจัดซูมกับมุมก้ม หลังจากนั้นปล่อยให้ผู้ใช้ซูมเองได้
+      camera.zoom = 17;
+      camera.pitch = 0;
+      camera.duration = 700;
+    } else {
+      camera.duration = 300;
+    }
+
+    map.easeTo(camera);
   }
 
   /**

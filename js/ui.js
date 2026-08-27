@@ -280,7 +280,7 @@ window.UI = (function () {
       setTimeout(() => {
         if (!window.Navigate.isActive) return;
         const pos = window.Store.state.userPosition || from;
-        window.MapView.navCamera(pos, window.Store.state.userHeading);
+        window.MapView.navCamera(pos, window.Store.state.userHeading, true);
       }, 1600);
       renderNav();
 
@@ -309,7 +309,7 @@ window.UI = (function () {
     window.Store.setFollowing(true);
 
     if (window.Navigate.isActive) {
-      window.MapView.navCamera(s.userPosition, s.userHeading);
+      window.MapView.navCamera(s.userPosition, s.userHeading, true);
     } else {
       window.MapView.followUser(s.userPosition, s.userHeading);
     }
