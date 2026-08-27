@@ -116,6 +116,14 @@ button:active { transform: scale(0.96); }
    * ขนาดของแผ่นความปลอดภัย คิดครั้งเดียวตรงนี้แล้วให้ทุกอย่างอ้างอิงร่วมกัน
    * ก่อนหน้านี้ปุ่มควบคุมแผนที่ใช้ตัวเลขคงที่เดา ๆ จึงทับขอบบนของแผ่น
    */
+  /*
+   * ที่ยืนของแถบสรุปการนำทาง (ถึงเวลา/ระยะเหลือ/เวลาเหลือ/จบ) วัดจากก้นจอ
+   * ปุ่มลอยทุกตัวระหว่างนำทางต้องอ้างค่านี้ ไม่ใช่เดาตัวเลขเอง
+   * ก่อนหน้านี้ปุ่มควบคุมแผนที่ตั้งไว้ที่ 84px ซึ่งต่ำกว่าขอบบนของแถบ เลยทับปุ่ม "จบ"
+   */
+  --navbar-h: 80px;
+  --above-navbar: calc(max(12px, calc(var(--safe-b) + 8px)) + var(--navbar-h) + 12px);
+
   --sheet-bottom: calc(var(--tabbar-h) + var(--safe-b) + 6px);
   --sheet-h: min(
     60cqh,
@@ -607,7 +615,7 @@ button:active { transform: scale(0.96); }
 .phone.is-navigating .view { display: none; }
 .phone.is-navigating .map-controls {
   top: auto;
-  bottom: calc(var(--safe-b) + 84px);
+  bottom: var(--above-navbar);
 }
 
 /* ปุ่มกลับไปล็อกกล้องที่ลูกศร (แบบ Google Maps) */
@@ -615,7 +623,7 @@ button:active { transform: scale(0.96); }
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(var(--safe-b) + 96px);
+  bottom: var(--above-navbar);
   z-index: 46;
   display: inline-flex;
   align-items: center;
@@ -1798,7 +1806,7 @@ body.picking .phone > #map::after {
   box-shadow: var(--shadow-sm);
 }
 .nav-status__shield { flex: none; font-size: 21px; color: var(--safety-color); display: grid; place-items: center; }
-.nav-status__text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.nav-status__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .nav-status__text strong {
   font-size: 14px;
   font-weight: 800;
@@ -1814,11 +1822,27 @@ body.picking .phone > #map::after {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* คะแนนเสี่ยงของเส้นทาง ตัวเลขชุดเดียวกับที่เห็นตอนดูสรุปก่อนออกรถ */
+.nav-status__score {
+  flex: none;
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: var(--safety-color);
+  font-variant-numeric: tabular-nums;
+}
+.nav-status__score small { font-size: 10px; font-weight: 700; opacity: 0.7; }
+/* ระดับอันตรายมากให้เต้นเรียกสายตา ระดับอื่นอยู่นิ่ง ๆ พอ */
+.nav-status__safety[data-level='critical'] { animation: livePulse 1.8s infinite; }
 
 /*
  * เตือนจุดเสี่ยงบนเส้นทางข้างหน้า — ต่อลงมาจากแถบความเร็ว
  * วางไว้ครึ่งบนเพราะเป็นสายตาที่ผู้ขับมองอยู่แล้ว และครึ่งล่างมีปุ่มควบคุม
  * กับแถบสรุปการเดินทางจองที่ไว้หมดแล้ว
+ */
+/*
+ * นี่คือข้อความที่สำคัญที่สุดบนจอตอนขับ จึงตั้งใจให้เด่นกว่าทุกอย่าง:
+ * พื้นทึบสีตามประเภทภัย ไอคอนใหญ่ ระยะเป็นตัวเลขตัวโต และมีแถบวัดความใกล้
  */
 .nav-hazard {
   --hazard-color: var(--warn);
@@ -1829,39 +1853,101 @@ body.picking .phone > #map::after {
   z-index: 22;
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 11px 14px;
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--hazard-color) 55%, transparent);
-  background: color-mix(in srgb, var(--hazard-color) 22%, var(--surface-solid));
-  box-shadow: var(--shadow);
-  animation: hazardIn 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+  gap: 12px;
+  padding: 13px 14px 15px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--hazard-color) 70%, transparent);
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--hazard-color) 42%, var(--surface-solid)),
+      color-mix(in srgb, var(--hazard-color) 18%, var(--surface-solid)));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--hazard-color) 25%, transparent),
+    0 14px 38px color-mix(in srgb, var(--hazard-color) 30%, transparent),
+    var(--shadow);
+  animation: hazardIn 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 @keyframes hazardIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(-10px) scale(0.97); }
 }
 /* จุดอันตรายให้เต้นเรียกสายตา ส่วนระดับอื่นอยู่นิ่ง ๆ พอ */
-.nav-hazard[data-severity='high'] { animation: hazardIn 0.28s ease, livePulse 1.6s 0.3s infinite; }
+.nav-hazard[data-severity='high'] { animation: hazardIn 0.3s ease, hazardBeat 1.5s 0.35s infinite; }
+@keyframes hazardBeat {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--hazard-color) 25%, transparent), 0 14px 38px color-mix(in srgb, var(--hazard-color) 30%, transparent), var(--shadow); }
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--hazard-color) 32%, transparent), 0 14px 44px color-mix(in srgb, var(--hazard-color) 45%, transparent), var(--shadow); }
+}
 
+/* ไอคอนใช้สีของประเภทภัย ส่วนการ์ดใช้สีตามความรุนแรง — คนละช่องทางกัน */
 .nav-hazard__icon {
   flex: none;
-  width: 38px;
-  height: 38px;
+  width: 46px;
+  height: 46px;
   display: grid;
   place-items: center;
-  font-size: 20px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--hazard-color) 32%, transparent);
+  font-size: 25px;
+  border-radius: 14px;
+  background: var(--hazard-type-color, var(--hazard-color));
   color: #fff;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.22),
+    0 4px 14px rgba(0, 0, 0, 0.35);
 }
-.nav-hazard__text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.nav-hazard__text strong { font-size: 15px; font-weight: 800; }
-.nav-hazard__text small {
-  font-size: 11.5px;
-  color: var(--text-dim);
+
+.nav-hazard__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nav-hazard__text strong {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.nav-hazard__text small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--text) 78%, transparent);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.nav-hazard__sev {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+/* ระยะที่เหลือ — ตัวเลขใหญ่พอให้ชายตามองแวบเดียวก็รู้ */
+.nav-hazard__dist {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.nav-hazard__dist b { font-size: 27px; font-weight: 900; letter-spacing: -1px; line-height: 1; }
+.nav-hazard__dist i { font-style: normal; font-size: 12px; font-weight: 700; opacity: 0.75; }
+.nav-hazard__dist b.is-here { font-size: 19px; letter-spacing: -0.3px; }
+
+/* แถบวัดความใกล้ที่ก้นการ์ด ยิ่งเข้าใกล้ยิ่งเต็ม */
+.nav-hazard__meter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.nav-hazard__meter i {
+  display: block;
+  height: 100%;
+  background: #fff;
+  opacity: 0.85;
+  transition: width 0.4s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
 /* ---------------- แผ่นสรุปการเดินทาง ---------------- */

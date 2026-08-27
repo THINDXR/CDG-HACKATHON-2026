@@ -493,6 +493,7 @@ window.UI = (function () {
     if (!a) {
       $('#navSafetyLabel').textContent = 'กำลังประเมิน';
       $('#navSafetyDetail').textContent = 'เส้นทางนี้';
+      $('#navSafetyScore').textContent = '';
       return;
     }
 
@@ -502,7 +503,12 @@ window.UI = (function () {
     $('#navSafetyDetail').textContent = a.points.length
       ? `${a.points.length} จุดเสี่ยงบนเส้นทาง`
       : 'ไม่พบจุดเสี่ยงบนเส้นทาง';
+    // ตัวเลขชุดเดียวกับที่แผ่นสรุปการเดินทางแสดงก่อนออกรถ จะได้เทียบกันได้
+    $('#navSafetyScore').innerHTML = `${a.score}<small>%</small>`;
   }
+
+  // โทนสีการ์ดเตือนตามระดับความรุนแรง — อุ่นทุกระดับ เพราะทุกอันคือ "สิ่งที่ต้องระวัง"
+  const ALERT_TONE = { low: '#ffb020', medium: '#ff8c1a', high: '#ff3b30' };
 
   /** แถบเตือนจุดเสี่ยงที่กำลังจะถึงบนเส้นทาง (null = ซ่อน) */
   function showNavHazard(hit) {
@@ -514,18 +520,44 @@ window.UI = (function () {
     }
 
     const def = CFG.HAZARD_TYPES[hit.report.type];
-    // ใกล้กว่า 30 ม. คือกำลังผ่านจุดนั้นพอดี บอก "อีก 0 ม." จะอ่านแล้วงง
-    const ahead = hit.ahead < 30 ? 'ตรงนี้' : `อีก ${U.formatDistance(hit.ahead)}`;
+    const sev = CFG.SEVERITY[hit.report.severity];
+
+    /*
+     * ระยะแยกตัวเลขกับหน่วย เพื่อให้ตัวเลขตัวใหญ่โดดออกมาอ่านได้ด้วยการชายตามอง
+     * ใกล้กว่า 30 ม. คือกำลังผ่านจุดนั้นพอดี บอก "อีก 0 ม." จะอ่านแล้วงง
+     */
+    const near = hit.ahead < 30;
+    const [num, unit] = U.formatDistance(hit.ahead).split(' ');
+
+    // แถบวัดความใกล้ ยิ่งเข้าใกล้ยิ่งเต็ม เห็นได้ทันทีว่ากำลังจะถึงแล้ว
+    const closeness = Math.round(
+      Math.min(100, Math.max(0, (1 - hit.ahead / window.RouteRisk.WARN_AHEAD_M) * 100))
+    );
 
     box.hidden = false;
     box.dataset.severity = hit.report.severity;
-    box.style.setProperty('--hazard-color', def.color);
+    /*
+     * สองช่องทางสื่อสาร: สีการ์ดบอก "ด่วนแค่ไหน" สีไอคอนบอก "ภัยชนิดไหน"
+     *
+     * ไม่ใช้สีประเภทภัยมาทาทั้งการ์ด เพราะบางประเภท (เช่นด่านตรวจ = คราม)
+     * สีใกล้เคียงการ์ดบอกทางเลี้ยวที่เป็นม่วง จนแยกไม่ออกว่าเป็นคนละอัน
+     * และสีเขียวของระดับ "เฝ้าระวัง" ก็อ่านเป็น "ปลอดภัย" ซึ่งผิดความหมายของการเตือน
+     */
+    box.style.setProperty('--hazard-color', ALERT_TONE[hit.report.severity]);
+    box.style.setProperty('--hazard-type-color', def.color);
     box.innerHTML = `
       <span class="nav-hazard__icon">${def.icon}</span>
       <span class="nav-hazard__text">
-        <strong>${escapeHtml(def.label)} ${ahead}</strong>
-        <small>${escapeHtml(hit.road)}</small>
-      </span>`;
+        <strong>${escapeHtml(def.label)}</strong>
+        <small>
+          <span class="nav-hazard__sev">${escapeHtml(sev.label)}</span>
+          ${escapeHtml(hit.road)}
+        </small>
+      </span>
+      <span class="nav-hazard__dist">
+        ${near ? '<b class="is-here">ตรงนี้</b>' : `<b>${num}</b><i>${unit}</i>`}
+      </span>
+      <span class="nav-hazard__meter"><i style="width:${closeness}%"></i></span>`;
   }
 
   function formatDuration(seconds) {
