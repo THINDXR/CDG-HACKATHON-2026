@@ -76,7 +76,19 @@ window.Route = (function () {
    * @returns {Promise<object>} เส้นทางที่แตกเป็นจุดย่อยพร้อมระยะสะสมและคำสั่งเลี้ยว
    */
   async function getRoute(from, to) {
-    const coords = `${from[0]},${from[1]};${to[0]},${to[1]}`;
+    return getRouteVia([from, to]);
+  }
+
+  /**
+   * เส้นทางที่ลากผ่านหลายจุดตามลำดับ
+   * ใช้กับเส้นทางสาธิตของโหมดจำลอง ที่ต้องอ้อมไปตามจุดที่กำหนดไว้หลายจุด
+   * @param {Array<[number, number]>} waypoints
+   */
+  async function getRouteVia(waypoints) {
+    if (!waypoints || waypoints.length < 2) {
+      throw new Error('ต้องมีอย่างน้อยจุดต้นทางกับปลายทาง');
+    }
+    const coords = waypoints.map((c) => `${c[0]},${c[1]}`).join(';');
     const url = `${ENDPOINT}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=false`;
 
     const res = await fetch(url);
@@ -186,5 +198,5 @@ window.Route = (function () {
     };
   }
 
-  return { getRoute, progress };
+  return { getRoute, getRouteVia, progress };
 })();

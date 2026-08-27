@@ -140,13 +140,22 @@ window.Alerts = (function () {
   const SIM_STEP_M = 8;
   const SIM_TICK_MS = 400;
 
-  function startSimulation() {
+  /**
+   * @param {Array<[number, number]>} [path] เส้นทางจริงที่ให้รถวิ่งตาม
+   *
+   * ถ้าส่ง path มา (เส้นทางเดียวกับที่กำลังนำทางอยู่) หัวลูกศรจะขนานกับถนนเสมอ
+   * ถ้าไม่ส่ง จะวิ่งตรงระหว่าง waypoint สาธิต ซึ่งลูกศรจะเฉียงออกจากถนนจริง
+   */
+  function startSimulation(path) {
     stopTracking();
     if (simTimer) clearInterval(simTimer);
-    simRoute = densify(SIM_WAYPOINTS, SIM_STEP_M);
+
+    const onRoute = Array.isArray(path) && path.length > 1;
+    simRoute = densify(onRoute ? path : SIM_WAYPOINTS, SIM_STEP_M);
     simIndex = 0;
     lastAlerted.clear();
-    window.MapView.setSimRoute(SIM_WAYPOINTS);
+    // ขับตามเส้นทางนำทางอยู่แล้ว ไม่ต้องวาดเส้นสาธิตซ้อนทับอีกเส้น
+    window.MapView.setSimRoute(onRoute ? null : SIM_WAYPOINTS);
     window.Store.setSimulating(true);
 
     simTimer = setInterval(() => {
@@ -156,7 +165,8 @@ window.Alerts = (function () {
       const speed = U.distance(coord, next) / (SIM_TICK_MS / 1000);
       window.Store.setUserPosition(coord, heading, speed);
       simIndex += 1;
-      if (simIndex >= simRoute.length) simIndex = 0; // วนซ้ำเส้นทาง
+      // ขับตามเส้นทางนำทางจะจบเองตอนถึงปลายทาง ส่วนเส้นสาธิตล้วนให้วนซ้ำ
+      if (simIndex >= simRoute.length) simIndex = onRoute ? simRoute.length - 1 : 0;
     }, SIM_TICK_MS);
   }
 
@@ -167,12 +177,6 @@ window.Alerts = (function () {
     }
     if (window.Store.state.simulating) window.Store.setSimulating(false);
     window.MapView.setSimRoute(null);
-  }
-
-  function toggleSimulation() {
-    if (simTimer) stopSimulation();
-    else startSimulation();
-    return !!simTimer;
   }
 
   /* ---------- คำนวณภัยข้างหน้า ---------- */
@@ -302,12 +306,12 @@ window.Alerts = (function () {
 
   return {
     settings,
+    SIM_WAYPOINTS,
     setSetting,
     startTracking,
     stopTracking,
     startSimulation,
     stopSimulation,
-    toggleSimulation,
     evaluate,
     check,
     notify,

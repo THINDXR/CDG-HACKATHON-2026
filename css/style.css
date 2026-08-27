@@ -1818,7 +1818,7 @@ body.picking .phone > #map::after {
   position: absolute;
   left: max(12px, var(--safe-l));
   right: max(12px, var(--safe-r));
-  top: calc(max(12px, calc(var(--safe-t) + 8px)) + 152px);
+  top: calc(max(12px, calc(var(--safe-t) + 8px)) + 160px);
   z-index: 22;
   display: flex;
   align-items: center;

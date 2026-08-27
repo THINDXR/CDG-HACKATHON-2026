@@ -342,13 +342,19 @@ window.UI = (function () {
       window.Store.setFollowing(true);
       setDetent('closed');
       window.MapView.setNavRoute(route.coordinates);
-      // โชว์เส้นทางทั้งเส้นให้เห็นภาพรวมก่อน แล้วค่อยซูมกลับเข้ามาที่ตัวผู้ใช้
-      window.MapView.fitRoute(route.coordinates);
-      setTimeout(() => {
-        if (!window.Navigate.isActive) return;
-        const pos = window.Store.state.userPosition || from;
-        window.MapView.navCamera(pos, window.Store.state.userHeading, true);
-      }, 1600);
+
+      if (opts.skipOverview) {
+        // โหมดจำลองเริ่มขับทันที ถ้ายังโชว์ภาพรวมอยู่กล้องจะถูกแย่งไปมา
+        window.MapView.navCamera(from, window.Store.state.userHeading, true);
+      } else {
+        // โชว์เส้นทางทั้งเส้นให้เห็นภาพรวมก่อน แล้วค่อยซูมกลับเข้ามาที่ตัวผู้ใช้
+        window.MapView.fitRoute(route.coordinates);
+        setTimeout(() => {
+          if (!window.Navigate.isActive) return;
+          const pos = window.Store.state.userPosition || from;
+          window.MapView.navCamera(pos, window.Store.state.userHeading, true);
+        }, 1600);
+      }
       renderNav();
 
       if (!window.Store.state.userPosition) {
@@ -385,11 +391,64 @@ window.UI = (function () {
 
   function stopNavigation() {
     window.Navigate.stop();
+    // โหมดจำลองขับตามเส้นทางที่นำทางอยู่ จบนำทางแล้วก็ต้องหยุดขับด้วย
+    // ไม่งั้นหมุดจะวิ่งต่อไปเรื่อย ๆ ทั้งที่ไม่มีเส้นทางแล้ว
+    if (window.Alerts.isSimulating) window.Alerts.stopSimulation();
     $('#phone').classList.remove('is-navigating');
     window.MapView.setNavRoute(null);
     showNavHazard(null);
     renderNav();
     setDetent('peek');
+    syncSettings();
+  }
+
+  /**
+   * เปิด/ปิดโหมดจำลองการขับ
+   *
+   * เปิดแล้วพาเข้าหน้านำทางเลย ไม่ใช่แค่ขยับหมุดอยู่บนหน้าแผนที่ และให้รถวิ่งตาม
+   * "เส้นทางจริงที่ OSRM คืนมา" ซึ่งเป็นเส้นเดียวกับที่กำลังนำทาง หัวลูกศรจึงขนาน
+   * กับถนนเสมอ (ของเดิมวิ่งเป็นเส้นตรงระหว่างจุดสาธิต ลูกศรเลยเฉียงออกจากเส้นสีน้ำเงิน)
+   */
+  async function toggleSimulationDrive() {
+    if (window.Alerts.isSimulating) {
+      stopNavigation();
+      window.Store.setFollowing(false);
+      syncStatusButtons();
+      toast('หยุดจำลองการขับแล้ว');
+      return;
+    }
+
+    window.Alerts.ensureAudio();
+    toast('กำลังเตรียมเส้นทางสาธิต…');
+
+    try {
+      const route = await window.Route.getRouteVia(window.Alerts.SIM_WAYPOINTS);
+      const path = route.coordinates;
+      const start = path[0];
+      const end = path[path.length - 1];
+
+      // วางตัวผู้ใช้ที่จุดเริ่มก่อน เพื่อให้การนำทางคิดจากตรงนั้น ไม่ใช่จากกลางจอ
+      window.Store.setUserPosition(start, U.bearing(start, path[1] || end), 0);
+
+      await startNavigation(
+        { lng: end[0], lat: end[1], label: 'ปลายทางเส้นทางสาธิต' },
+        { vehicle: 'car', preRoute: route, skipOverview: true }
+      );
+      // เริ่มขับหลังจากตั้งโหมดนำทางเสร็จ กล้องจะได้ไม่โดนแย่งระหว่างจัดมุมครั้งแรก
+      window.Alerts.startSimulation(path);
+      toast('เริ่มจำลองการขับตามเส้นทางสาธิต');
+    } catch (_) {
+      /*
+       * ต่อ OSRM ไม่ได้ (ออฟไลน์/เซิร์ฟเวอร์ล่ม) — ยังให้ขับตามเส้นสาธิตแบบเดิมได้
+       * จะไม่มีหน้านำทางกับคำสั่งเลี้ยว แต่ยังใช้ทดสอบการเตือนภัยรอบตัวได้อยู่
+       */
+      window.Alerts.startSimulation();
+      window.Store.setFollowing(true);
+      toast('ต่อเซิร์ฟเวอร์เส้นทางไม่ได้ — ขับตามเส้นสาธิตแบบไม่มีการนำทาง', 'warn');
+    }
+
+    syncSettings();
+    syncStatusButtons();
   }
 
   /** วาดการ์ดนำทางและแถบสรุปด้านล่างจากความคืบหน้าล่าสุด */
@@ -1281,10 +1340,15 @@ window.UI = (function () {
     setDetent('closed');
   }
 
-  /** เลือกรายการแล้ว — แผ่นสลับเป็นหน้ารายละเอียด เปิดครึ่งจอให้เห็นแผนที่ด้วย */
+  /**
+   * เลือกรายการแล้ว — แผ่นสลับเป็นหน้ารายละเอียด
+   *
+   * ต้องกางเต็มแผ่น ไม่ใช่ครึ่งจอ เพราะการ์ดรายละเอียดสูงกว่าครึ่งจอ
+   * ถ้าเปิดแค่ 'half' ปุ่ม "นำทางไปจุดนี้" จะจมอยู่หลังแท็บบาร์
+   */
   function collapseToMap() {
     closeSearchView();
-    setDetent('half');
+    setDetent(window.Store.state.selectedId ? 'full' : 'half');
   }
 
   /* ---------- สถานะปุ่มติดตาม / เสียง ---------- */
@@ -1331,7 +1395,11 @@ window.UI = (function () {
       startNavigation(dest, { vehicle, preRoute });
     });
     // ปุ่มย้อนกลับในหน้ารายละเอียด — เลิกเลือกแล้วแผ่นจะกลับเป็นรายการเอง
-    $('#btnBack').addEventListener('click', () => window.Store.select(null));
+    // และหุบกลับมาระดับแง้ม เพราะรายการไม่ต้องใช้ที่เยอะเท่าการ์ดรายละเอียด
+    $('#btnBack').addEventListener('click', () => {
+      window.Store.select(null);
+      setDetent('peek');
+    });
     $('#filterClose').addEventListener('click', () => closeOverlay('#filterSheet'));
     $('#filterSheet').addEventListener('click', (e) => {
       if (e.target.id === 'filterSheet') closeOverlay('#filterSheet');
@@ -1441,6 +1509,7 @@ window.UI = (function () {
     syncSettings,
     startNavigation,
     stopNavigation,
+    toggleSimulationDrive,
     goToMyLocation,
     showDetailSheet: collapseToMap,
 

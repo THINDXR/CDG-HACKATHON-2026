@@ -195,13 +195,8 @@
       window.UI.toast('กำลังขอตำแหน่งจากอุปกรณ์…');
     });
 
-    $('#setSim').addEventListener('change', () => {
-      window.Alerts.ensureAudio();
-      const running = window.Alerts.toggleSimulation();
-      window.Store.setFollowing(running);
-      window.UI.syncStatusButtons();
-      window.UI.toast(running ? 'เริ่มจำลองการขับตามเส้นทางสาธิต' : 'หยุดจำลองการขับแล้ว');
-    });
+    // เปิดโหมดจำลอง = เข้าหน้านำทางไปเลย (UI เป็นคนจัดเส้นทาง กล้อง และแผ่นให้)
+    $('#setSim').addEventListener('change', () => window.UI.toggleSimulationDrive());
   }
 
   /* ---------- ปุ่มควบคุมแผนที่ ---------- */
