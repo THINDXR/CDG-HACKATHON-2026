@@ -186,8 +186,10 @@ window.UI = (function () {
 
       li.addEventListener('click', () => {
         window.Store.select(item.id);
-        window.MapView.flyToReport(item);
+        // กางแผ่นก่อนแล้วค่อยบินไปหาหมุด กล้องจะได้รู้ว่าเหลือพื้นที่ให้เห็นแค่ไหน
+        // ถ้าบินก่อน มันจะเล็งด้วยขนาดแผ่นเดิม พอแผ่นกางขึ้นมาก็ทับหมุดพอดี
         collapseToMap();
+        window.MapView.flyToReport(item);
       });
       list.appendChild(li);
     }
@@ -972,8 +974,8 @@ window.UI = (function () {
       li.addEventListener('click', () => {
         setView('map');
         window.Store.select(item.id);
-        window.MapView.flyToReport(item);
         collapseToMap();
+        window.MapView.flyToReport(item);
       });
       list.appendChild(li);
     }
@@ -1305,6 +1307,39 @@ window.UI = (function () {
     $('#sheetPeekCount').textContent = $('#sidebarCount').textContent;
 
     syncSheetToggle();
+    syncMapInsets(name);
+  }
+
+  /**
+   * บอกแผนที่ว่าตอนนี้มี UI บังอยู่เท่าไร กล้องจะได้เล็งกลาง "ส่วนที่มองเห็น"
+   *
+   * แผนที่กินพื้นที่เต็มจอ แต่แถบค้นหาบังด้านบนและแผ่นความปลอดภัยบังด้านล่าง
+   * ถ้าไม่บอก กล้องจะเล็งกลางจอจริง แล้วหัวลูกศรของผู้ใช้ไปโผล่หลังแผ่นพอดี
+   *
+   * ใช้ offsetTop/offsetHeight ซึ่งไม่นับ transform จึงอ่านค่าได้ทันทีที่สั่งเลื่อนแผ่น
+   * ไม่ต้องรอแอนิเมชัน 320 มิลลิวินาทีจบก่อน (getBoundingClientRect จะได้ค่ากลางทาง)
+   */
+  function syncMapInsets(name = detent) {
+    const sheet = $('#sidebar');
+    const phoneH = $('#phone').clientHeight;
+    if (!phoneH || !sheet.offsetHeight) return;
+
+    // ระยะจากก้นจอถึงขอบล่างของแผ่น (ตอนยังไม่ถูกเลื่อนลง)
+    const bottomGap = phoneH - sheet.offsetTop - sheet.offsetHeight;
+    const shownPct = name === 'closed' ? 0 : 1 - DETENTS[name] / 100;
+    const covered = bottomGap + sheet.offsetHeight * shownPct;
+
+    // ปิดแผ่นแล้วยังมีแท็บบาร์กับแถบดึงแผ่นอยู่ จึงกันที่ไว้เท่านั้นเป็นอย่างน้อย
+    const floor = $('.tabbar').offsetHeight + 56;
+    const top = $('.searchbar').offsetHeight + 24;
+    let bottom = Math.max(floor, covered);
+
+    // ตอนกางเต็มแผ่นบนจอเตี้ย ระยะบน+ล่างอาจรวมกันเกินความสูงจอ
+    // จนไม่เหลือพื้นที่ให้กล้องเล็ง — ต้องเหลือช่องว่างไว้อย่างน้อย 120px เสมอ
+    const maxTotal = phoneH - 120;
+    if (top + bottom > maxTotal) bottom = Math.max(0, maxTotal - top);
+
+    window.MapView.setViewInsets({ top, bottom });
   }
 
   /**

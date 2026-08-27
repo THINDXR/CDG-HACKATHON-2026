@@ -605,8 +605,8 @@ window.MapView = (function () {
         [Math.min(...lngs), Math.min(...lats)],
         [Math.max(...lngs), Math.max(...lats)],
       ],
-      // เผื่อที่ให้แถบบน ป้ายความเสี่ยง และปุ่มลอยด้านล่าง
-      { padding: { top: 150, bottom: 130, left: 45, right: 45 } }
+      // เผื่อที่ให้แถบค้นหาด้านบนกับแผ่นความปลอดภัยด้านล่างที่บังแผนที่อยู่จริง
+      { padding: insetPadding({ left: 45, right: 45 }) }
     );
     if (!camera) return false;
 
@@ -616,7 +616,14 @@ window.MapView = (function () {
     const minZoom = styleMode === 'plain' ? 11.5 : 13.5;
     const zoom = Math.max(minZoom, Math.min(15.2, camera.zoom));
     // มุมมอง 2 มิติ หันทิศเหนือเสมอ
-    map.easeTo({ center: camera.center, zoom, pitch: 0, bearing: 0, duration });
+    map.easeTo({
+      center: camera.center,
+      zoom,
+      pitch: 0,
+      bearing: 0,
+      padding: insetPadding({ left: 45, right: 45 }),
+      duration,
+    });
     updateCompass();
     return true;
   }
@@ -659,6 +666,30 @@ window.MapView = (function () {
 
   /* ---------- ตำแหน่งผู้ใช้ ---------- */
 
+  /*
+   * ส่วนของจอที่ถูก UI อื่นบังอยู่ (แถบค้นหาด้านบน แผ่นความปลอดภัยด้านล่าง)
+   *
+   * แผนที่กินพื้นที่เต็มจอ ถ้าสั่งให้กล้อง "เล็งกลาง" ตรง ๆ จุดที่เล็งจะไปตกกลางจอจริง
+   * ซึ่งอาจอยู่หลังแผ่นความปลอดภัย — หัวลูกศรของผู้ใช้เลยโดนแผ่นทับ
+   * ใส่ค่านี้เป็น padding ให้ MapLibre กล้องจะเล็งกลาง "พื้นที่ที่มองเห็นจริง" แทน
+   */
+  let viewInsets = { top: 0, bottom: 0 };
+
+  function setViewInsets(insets) {
+    viewInsets = { top: 0, bottom: 0, ...insets };
+  }
+
+  /** padding สำหรับกล้อง คิดจากส่วนที่ UI บังอยู่ตอนนี้ */
+  function insetPadding(extra = {}) {
+    return {
+      top: viewInsets.top,
+      bottom: viewInsets.bottom,
+      left: 0,
+      right: 0,
+      ...extra,
+    };
+  }
+
   function setUserPuck(coord, heading) {
     if (!map || !coord) return;
     if (!userMarker) {
@@ -696,6 +727,8 @@ window.MapView = (function () {
       bearing: 0,
       pitch: 0, // มุมมอง 2 มิติเสมอ
       zoom: Math.max(map.getZoom(), 16),
+      // เล็งกลางพื้นที่ที่มองเห็น ไม่ใช่กลางจอ ไม่งั้นลูกศรไปอยู่หลังแผ่นความปลอดภัย
+      padding: insetPadding(),
       duration: 900,
       easing: (t) => t * (2 - t),
     });
@@ -710,6 +743,8 @@ window.MapView = (function () {
       zoom: opts.zoom ?? 17,
       pitch: opts.pitch ?? 65,
       bearing: opts.bearing ?? map.getBearing(),
+      // หมุดต้องอยู่เหนือแผ่นรายละเอียดที่กำลังจะกางขึ้นมา ไม่ใช่ถูกมันบัง
+      padding: insetPadding(),
       duration: 1200,
       essential: true,
     });
@@ -793,6 +828,7 @@ window.MapView = (function () {
     setNavRoute,
     fitRoute,
     navCamera,
+    setViewInsets,
     setUserPuck,
     followUser,
     toggle3D,

@@ -24,10 +24,11 @@
 
     window.MapView.onMarkerClick = (id) => {
       window.Store.select(id);
+      // กดหมุดบนแผนที่ก็ให้แผ่นเปิดมาแสดงรายละเอียดเช่นเดียวกับกดจากรายการ
+      // ต้องกางแผ่นก่อนบิน กล้องจะได้เล็งหมุดไว้เหนือแผ่น ไม่ใช่ไปอยู่หลังมัน
+      window.UI.showDetailSheet();
       const r = window.Store.state.reports.find((x) => x.id === id);
       if (r) window.MapView.flyToReport(r, { zoom: Math.max(window.MapView.instance.getZoom(), 16.5) });
-      // กดหมุดบนแผนที่ก็ให้แผ่นเปิดมาแสดงรายละเอียดเช่นเดียวกับกดจากรายการ
-      window.UI.showDetailSheet();
     };
 
     window.MapView.onReady(() => {
