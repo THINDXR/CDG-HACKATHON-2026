@@ -10,21 +10,37 @@ window.Navigate = (function () {
   let route = null;
   let destination = null;   // { lng, lat, label }
   let progress = null;
+  let vehicle = 'car';      // 'car' | 'motorbike'
+  let analysis = null;      // ผลจาก RouteRisk.analyze() ของเส้นทางที่กำลังใช้
   let lastIndex = 0;
   let lastRecalcAt = 0;
   let spokenFor = null;     // จำว่าพูดเตือนทางเลี้ยวไหนไปแล้ว
+  let warnedHazards = new Set(); // จุดเสี่ยงบนเส้นทางที่เตือนไปแล้ว
   let recalculating = false;
 
   let onChange = () => {};
   let onFinish = () => {};
+  let onHazard = () => {};
 
-  /** เริ่มนำทางไปยังจุดหมาย */
-  async function start(from, dest) {
+  /** วิเคราะห์ความเสี่ยงของเส้นทางปัจจุบันใหม่ (เรียกทุกครั้งที่เส้นทางเปลี่ยน) */
+  function reanalyze() {
+    analysis = route ? window.RouteRisk.analyze(route, vehicle) : null;
+  }
+
+  /**
+   * เริ่มนำทางไปยังจุดหมาย
+   * @param {object} opts.preRoute เส้นทางที่คำนวณไว้แล้ว (จากแผ่นสรุปการเดินทาง)
+   *   ส่งมาเพื่อไม่ต้องยิง OSRM ซ้ำรอบสอง
+   */
+  async function start(from, dest, opts = {}) {
     destination = dest;
-    route = await window.Route.getRoute(from, [dest.lng, dest.lat]);
+    vehicle = opts.vehicle || 'car';
+    route = opts.preRoute || (await window.Route.getRoute(from, [dest.lng, dest.lat]));
     lastIndex = 0;
     spokenFor = null;
+    warnedHazards = new Set();
     lastRecalcAt = Date.now();
+    reanalyze();
     progress = window.Route.progress(route, from, 0);
     onChange();
     return route;
@@ -34,8 +50,17 @@ window.Navigate = (function () {
     route = null;
     destination = null;
     progress = null;
+    analysis = null;
     lastIndex = 0;
     spokenFor = null;
+    warnedHazards = new Set();
+    onChange();
+  }
+
+  /** เปลี่ยนพาหนะระหว่างทาง — เส้นทางเดิม แต่เวลาและความเสี่ยงคิดใหม่ */
+  function setVehicle(key) {
+    vehicle = key;
+    reanalyze();
     onChange();
   }
 
@@ -60,7 +85,33 @@ window.Navigate = (function () {
     }
 
     announce();
+    warnHazardAhead();
     onChange();
+  }
+
+  /**
+   * เตือนจุดเสี่ยงที่อยู่ "บนเส้นทาง" ข้างหน้า
+   *
+   * ต่างจาก Alerts.check() ตรงที่อันนั้นดูรัศมีรอบตัวกับทิศที่หันไป จึงเตือนภัย
+   * บนถนนคู่ขนานได้ ส่วนอันนี้เอาเฉพาะจุดที่ RouteRisk จับคู่เข้ากับเส้นทางแล้ว
+   * จึงมั่นใจได้ว่าเป็นจุดที่เราจะวิ่งผ่านจริง ๆ
+   */
+  function warnHazardAhead() {
+    if (!analysis) return;
+    const next = window.RouteRisk.upcoming(analysis, progress.travelled);
+
+    if (!next) {
+      onHazard(null);
+      return;
+    }
+    onHazard(next);
+
+    if (warnedHazards.has(next.report.id)) return;
+    warnedHazards.add(next.report.id);
+
+    const def = window.APP_CONFIG.HAZARD_TYPES[next.report.type];
+    window.Alerts?.notify(next.report.severity);
+    speak(`ระวัง ${def.label} ข้างหน้า ${U.formatDistance(next.ahead)} บน${next.road}`);
   }
 
   /** พูดเตือนล่วงหน้าก่อนถึงทางเลี้ยว — พูดครั้งเดียวต่อหนึ่งทางเลี้ยว */
@@ -95,6 +146,8 @@ window.Navigate = (function () {
       route = await window.Route.getRoute(position, [destination.lng, destination.lat]);
       lastIndex = 0;
       spokenFor = null;
+      warnedHazards = new Set();
+      reanalyze();
       progress = window.Route.progress(route, position, 0);
       speak('กำลังคำนวณเส้นทางใหม่');
       onChange();
@@ -109,11 +162,15 @@ window.Navigate = (function () {
     start,
     stop,
     update,
+    setVehicle,
     get isActive() { return !!route; },
     get route() { return route; },
     get destination() { return destination; },
     get progress() { return progress; },
+    get vehicle() { return vehicle; },
+    get analysis() { return analysis; },
     set onChange(fn) { onChange = fn; },
     set onFinish(fn) { onFinish = fn; },
+    set onHazard(fn) { onHazard = fn; },
   };
 })();

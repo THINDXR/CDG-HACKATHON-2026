@@ -176,6 +176,8 @@ window.Route = (function () {
       index,
       offRoute,
       remaining,
+      // ระยะที่วิ่งมาแล้ว ใช้หาว่าจุดเสี่ยงบนเส้นทางอยู่ข้างหน้าอีกกี่เมตร
+      travelled,
       // ความเร็วเฉลี่ยจาก OSRM ใช้ประมาณเวลาที่เหลือตามสัดส่วนระยะทาง
       remainingSeconds: total > 0 ? (route.duration * remaining) / total : 0,
       step: next || route.steps[route.steps.length - 1],

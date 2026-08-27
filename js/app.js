@@ -63,13 +63,13 @@
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const coord = [pos.coords.longitude, pos.coords.latitude];
-        window.Store.setUserPosition(coord, pos.coords.heading);
+        window.Store.setUserPosition(coord, pos.coords.heading, pos.coords.speed);
         window.MapView.setUserPuck(coord, pos.coords.heading);
         window.MapView.followUser(coord, pos.coords.heading);
         warnIfFarFromData(coord);
       },
       () => {
-        window.UI.toast('ยังไม่ได้เปิดตำแหน่ง — แตะปุ่ม 📍 เพื่อดูภัยรอบตัวคุณ');
+        window.UI.toast('ยังไม่ได้เปิดตำแหน่ง — แตะปุ่มตำแหน่งทางขวาของแผนที่ เพื่อดูภัยรอบตัวคุณ');
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
     );
@@ -100,6 +100,9 @@
       window.UI.stopNavigation();
       window.UI.toast(`ถึง${dest?.label || 'จุดหมาย'}แล้ว 🏁`, 'success');
     };
+
+    // จุดเสี่ยงที่อยู่บนเส้นทางข้างหน้า (null = ไม่มีจุดไหนใกล้แล้ว)
+    window.Navigate.onHazard = (hit) => window.UI.showNavHazard(hit);
   }
 
   function wireStore() {
@@ -113,11 +116,26 @@
         window.UI.renderDetail();
       }
 
+      /*
+       * ตัวเลขบนชิปเปลี่ยนเฉพาะตอนจำนวนรายงานเปลี่ยน จึงวาดใหม่เท่าที่จำเป็น
+       * (renderList ถูกเรียกทุก 2 วิระหว่างติดตามตำแหน่ง ถ้าวาดชิปด้วยจะรีเซ็ต
+       * ตำแหน่งที่ผู้ใช้ปัดแถบชิปไว้ทุกครั้ง) ส่วนกรณี 'filter' syncFilters จัดการเอง
+       */
+      if (['load', 'reset', 'add', 'remove'].includes(reason)) {
+        window.UI.renderTypeChips();
+      }
+
       if (reason === 'position') {
         window.MapView.setUserPuck(state.userPosition, state.userHeading);
 
         if (window.Navigate.isActive) {
           window.Navigate.update(state.userPosition);
+          /*
+           * มาตรวัดความเร็วต้องเดินตามตำแหน่งเสมอ ไม่ใช่ตามความคืบหน้าของเส้นทาง
+           * เพราะ Navigate.update() จะไม่ยิง onChange ตอนหลุดเส้นทาง (มันไปเข้า
+           * recalculate แทน) ถ้าพึ่ง onChange อย่างเดียว เข็มจะค้างอยู่ที่ค่าเดิม
+           */
+          window.UI.renderNavStatus();
           // กล้องเกาะลูกศรเฉพาะตอนที่ยังล็อกอยู่ ถ้าผู้ใช้เลื่อนแผนที่เองจะปล่อยให้ดูอิสระ
           if (state.following) {
             window.MapView.navCamera(state.userPosition, state.userHeading);
@@ -189,7 +207,10 @@
   /* ---------- ปุ่มควบคุมแผนที่ ---------- */
 
   function wireMapControls() {
-    // ไม่มีปุ่ม +/- แล้ว ใช้นิ้วหุบ-กางซูมแทน (เหมือนแอปแผนที่ทั่วไปบนมือถือ)
+    // ปุ่มซูม +/- แบบเดียวกับ Google Maps (นิ้วหุบ-กางก็ยังใช้ได้ตามเดิม)
+    $('#btnZoomIn').addEventListener('click', () => window.MapView.zoomBy(1));
+    $('#btnZoomOut').addEventListener('click', () => window.MapView.zoomBy(-1));
+
     // ปุ่มพากลับไปที่หัวลูกศรของเรา ใช้ได้ทั้งหน้าแผนที่และระหว่างนำทาง
     $('#btnMyLocation').addEventListener('click', () => window.UI.goToMyLocation());
 

@@ -48,6 +48,7 @@ window.Alerts = (function () {
     if (watchId != null) navigator.geolocation.clearWatch(watchId);
 
     let lastCoord = null;
+    let lastAt = 0;
 
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -62,9 +63,23 @@ window.Alerts = (function () {
         if (heading === undefined && lastCoord && U.distance(lastCoord, coord) > 8) {
           heading = U.bearing(lastCoord, coord);
         }
-        if (!lastCoord || U.distance(lastCoord, coord) > 8) lastCoord = coord;
 
-        window.Store.setUserPosition(coord, heading);
+        /*
+         * ความเร็วสำหรับมาตรวัด km/h บนการ์ดนำทาง
+         * ถ้าอุปกรณ์ไม่ให้ coords.speed มา ก็คำนวณเองจากระยะ/เวลาระหว่างสองจุด
+         */
+        let speed = Number.isFinite(pos.coords.speed) ? pos.coords.speed : undefined;
+        if (speed === undefined && lastCoord && lastAt) {
+          const dt = (pos.timestamp - lastAt) / 1000;
+          if (dt > 0.4 && dt < 15) speed = U.distance(lastCoord, coord) / dt;
+        }
+
+        if (!lastCoord || U.distance(lastCoord, coord) > 8) {
+          lastCoord = coord;
+          lastAt = pos.timestamp;
+        }
+
+        window.Store.setUserPosition(coord, heading, speed);
       },
       (err) => {
         const msg =
@@ -117,10 +132,18 @@ window.Alerts = (function () {
     return out;
   }
 
+  /*
+   * ระยะต่อก้าวและจังหวะเดินของโหมดจำลอง
+   * 8 เมตร ทุก 400 มิลลิวินาที = 20 ม./วิ ≈ 72 กม./ชม. ซึ่งเป็นความเร็วขับจริง
+   * (ตัวเลขนี้สำคัญขึ้นตั้งแต่มีมาตรวัด km/h เพราะถ้าเดินเร็วเกินจริง เข็มจะโชว์ค่ามั่ว)
+   */
+  const SIM_STEP_M = 8;
+  const SIM_TICK_MS = 400;
+
   function startSimulation() {
     stopTracking();
     if (simTimer) clearInterval(simTimer);
-    simRoute = densify(SIM_WAYPOINTS, 22);
+    simRoute = densify(SIM_WAYPOINTS, SIM_STEP_M);
     simIndex = 0;
     lastAlerted.clear();
     window.MapView.setSimRoute(SIM_WAYPOINTS);
@@ -130,10 +153,11 @@ window.Alerts = (function () {
       const coord = simRoute[simIndex];
       const next = simRoute[Math.min(simIndex + 1, simRoute.length - 1)];
       const heading = U.bearing(coord, next);
-      window.Store.setUserPosition(coord, heading);
+      const speed = U.distance(coord, next) / (SIM_TICK_MS / 1000);
+      window.Store.setUserPosition(coord, heading, speed);
       simIndex += 1;
       if (simIndex >= simRoute.length) simIndex = 0; // วนซ้ำเส้นทาง
-    }, 400);
+    }, SIM_TICK_MS);
   }
 
   function stopSimulation() {
@@ -189,6 +213,13 @@ window.Alerts = (function () {
     const nearby = evaluate(position, heading);
     onNearbyChange(nearby);
 
+    /*
+     * ระหว่างนำทาง ปล่อยให้ Navigate เป็นเจ้าของการเตือนจุดเสี่ยงแต่ผู้เดียว
+     * เพราะมันวัดระยะตามแนวเส้นทางจริง จึงไม่เตือนภัยที่อยู่บนถนนคู่ขนาน
+     * และไม่ให้ผู้ขับได้ยินเสียงพูดซ้ำสองชุดพร้อมกัน
+     */
+    if (window.Navigate?.isActive) return nearby;
+
     const now = Date.now();
     for (const item of nearby) {
       if (!item.ahead) continue;
@@ -214,6 +245,17 @@ window.Alerts = (function () {
     if (settings.voice) speak(`${def.label}ข้างหน้า ${dist} ${item.report.road || ''}`);
     if (settings.vibrate && navigator.vibrate) {
       navigator.vibrate(item.report.severity === 'high' ? [120, 60, 120] : [90]);
+    }
+  }
+
+  /**
+   * เสียง + สั่นเตือนตามการตั้งค่า (ไม่มีข้อความ)
+   * ใช้ตอนที่ผู้เรียกจะเขียนข้อความเตือนเอง เช่น Navigate เตือนจุดเสี่ยงบนเส้นทาง
+   */
+  function notify(severity = 'medium') {
+    if (settings.sound) beep(severity);
+    if (settings.vibrate && navigator.vibrate) {
+      navigator.vibrate(severity === 'high' ? [120, 60, 120] : [90]);
     }
   }
 
@@ -268,6 +310,7 @@ window.Alerts = (function () {
     toggleSimulation,
     evaluate,
     check,
+    notify,
     ensureAudio,
     speak,
     get isSimulating() { return !!simTimer; },

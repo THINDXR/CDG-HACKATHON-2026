@@ -11,6 +11,7 @@ window.Store = (function () {
     selectedId: null,
     userPosition: null, // [lng, lat]
     userHeading: null,  // องศา
+    userSpeed: null,    // เมตร/วินาที (null = ยังไม่รู้)
     following: false,
     simulating: false,
     search: '',
@@ -108,15 +109,32 @@ window.Store = (function () {
     emit('filter');
   }
 
+  /** แสดงเฉพาะประเภทเดียว — ใช้กับแถบชิปที่กดเลือกทีละอัน */
+  function setOnlyType(type) {
+    state.activeTypes = new Set([type]);
+    emit('filter');
+  }
+
+  /** จำนวนรายงานของแต่ละประเภท (ไม่สนตัวกรอง) ใช้ติดตัวเลขบนชิป */
+  function countsByType() {
+    const out = {};
+    for (const r of state.reports) out[r.type] = (out[r.type] || 0) + 1;
+    return out;
+  }
+
   function select(id) {
     state.selectedId = id;
     emit('select');
   }
 
-  function setUserPosition(coord, heading) {
+  function setUserPosition(coord, heading, speed) {
     state.userPosition = coord;
     if (typeof heading === 'number' && !Number.isNaN(heading)) {
       state.userHeading = heading;
+    }
+    // ความเร็วไม่ได้มีมาทุกครั้ง (GPS ตอนอยู่นิ่งมักคืน null) จึงเก็บเฉพาะค่าที่ใช้ได้
+    if (typeof speed === 'number' && Number.isFinite(speed) && speed >= 0) {
+      state.userSpeed = speed;
     }
     emit('position');
   }
@@ -255,6 +273,25 @@ window.Store = (function () {
     };
   }
 
+  /**
+   * ความเสี่ยงของ "จุดเดียว" เป็น 0-100 — ใช้ติดป้าย % บนรายการจุดใกล้เคียง
+   * เพื่อให้เทียบความน่ากลัวของแต่ละจุดได้ในสายตาเดียว
+   * คิดจาก ความรุนแรง × ความใกล้ × ความน่าเชื่อถือของรายงาน
+   */
+  function pointRisk(report, distance) {
+    const severity = CFG.SEVERITY[report.severity].weight / 3;
+    const trust = Math.max(0.4, (report.confirms + 1) / (report.confirms + report.denies + 1));
+    // อยู่ในรัศมีเตือนของจุดนั้น = ใกล้เต็มร้อย แล้วค่อย ๆ ลดจนหมดที่ RISK_IMMEDIATE
+    const near =
+      distance == null
+        ? 0.6
+        : distance <= report.radius
+          ? 1
+          : Math.max(0, 1 - (distance - report.radius) / RISK_IMMEDIATE);
+
+    return Math.round(Math.min(100, severity * (0.25 + 0.75 * near) * trust * 100));
+  }
+
   function toGeoJSON() {
     return {
       type: 'FeatureCollection',
@@ -325,6 +362,8 @@ window.Store = (function () {
     vote,
     toggleType,
     setAllTypes,
+    setOnlyType,
+    countsByType,
     setSearch,
     select,
     setUserPosition,
@@ -333,6 +372,7 @@ window.Store = (function () {
     visibleReports,
     sortedByDistance,
     riskAssessment,
+    pointRisk,
     toGeoJSON,
     resetToSeed,
   };
