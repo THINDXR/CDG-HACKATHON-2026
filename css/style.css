@@ -110,6 +110,20 @@ button:active { transform: scale(0.96); }
   --below-search: calc(var(--below-topbar) + var(--search-h) + 8px);
   /* แถบชิปสูงกว่าตัวชิป 14px เพราะมี padding เผื่อเงาไว้บน-ล่าง */
   --below-filters: calc(var(--below-search) + var(--chips-h) + 14px + 8px);
+
+  /*
+   * ขนาดของแผ่นความปลอดภัย คิดครั้งเดียวตรงนี้แล้วให้ทุกอย่างอ้างอิงร่วมกัน
+   * ก่อนหน้านี้ปุ่มควบคุมแผนที่ใช้ตัวเลขคงที่เดา ๆ จึงทับขอบบนของแผ่น
+   */
+  --sheet-bottom: calc(var(--tabbar-h) + var(--safe-b) + 6px);
+  --sheet-h: min(
+    60cqh,
+    calc(100cqh - var(--below-filters) - var(--tabbar-h) - var(--safe-b) - 14px)
+  );
+  /* ระดับ "แง้ม" เลื่อนลง 56% จึงเหลือให้เห็น 44% ของความสูงแผ่น */
+  --sheet-peek: calc(var(--sheet-h) * 0.44);
+  /* ขอบบนของแผ่นตอนแง้ม วัดจากก้นจอ — ใช้วางปุ่มลอยไม่ให้ทับกัน */
+  --above-sheet: calc(var(--sheet-bottom) + var(--sheet-peek) + 12px);
 }
 
 /* บนจอกว้าง แสดงเป็นเครื่อง iPhone กลางจอ */
@@ -1626,13 +1640,9 @@ body.picking .phone > #map::after {
     top: auto;
     left: max(8px, var(--safe-l));
     right: max(8px, var(--safe-r));
-    bottom: calc(var(--tabbar-h) + var(--safe-b) + 6px);
+    bottom: var(--sheet-bottom);
     width: auto;
-    /*
-     * สูงได้แค่ไหน = ความสูงจอ ลบแถบด้านล่าง (แท็บบาร์) และแถบด้านบน
-     * (แถบชื่อแอป + ค้นหา + ชิปกรอง) เพื่อไม่ให้แผ่นเลื่อนขึ้นไปทับชิป
-     */
-    height: min(60cqh, calc(100cqh - var(--below-filters) - var(--tabbar-h) - var(--safe-b) - 14px));
+    height: var(--sheet-h);
     transform: translateY(var(--sheet-shift, calc(100% + 16px)));
     transition: transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1);
   }
@@ -1646,7 +1656,7 @@ body.picking .phone > #map::after {
 
   /* ยกปุ่มควบคุมขึ้นเหนือแผ่นตอนแง้ม */
   .sidebar[data-detent='peek'] ~ .map-controls {
-    bottom: calc(27cqh + var(--tabbar-h) + 20px);
+    bottom: var(--above-sheet);
     transition: bottom 0.32s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.2s ease;
   }
   .sidebar[data-detent='half'] ~ .map-controls,
@@ -1703,7 +1713,7 @@ body.picking .phone > #map::after {
     bottom: calc(var(--tabbar-h) + var(--safe-b) + 64px);
     right: max(12px, var(--safe-r));
   }
-  .map-btn { width: 46px; height: 46px; font-size: 16px; }
+  .map-btn { width: 48px; height: 48px; font-size: 18px; }
   .toasts { bottom: max(150px, calc(var(--safe-b) + 138px)); }
 
   .maplibregl-ctrl-attrib { max-width: 62cqw; }

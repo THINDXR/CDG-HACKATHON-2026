@@ -189,9 +189,7 @@
   /* ---------- ปุ่มควบคุมแผนที่ ---------- */
 
   function wireMapControls() {
-    $('#btnZoomIn').addEventListener('click', () => window.MapView.zoomBy(1));
-    $('#btnZoomOut').addEventListener('click', () => window.MapView.zoomBy(-1));
-
+    // ไม่มีปุ่ม +/- แล้ว ใช้นิ้วหุบ-กางซูมแทน (เหมือนแอปแผนที่ทั่วไปบนมือถือ)
     // ปุ่มพากลับไปที่หัวลูกศรของเรา ใช้ได้ทั้งหน้าแผนที่และระหว่างนำทาง
     $('#btnMyLocation').addEventListener('click', () => window.UI.goToMyLocation());
 
