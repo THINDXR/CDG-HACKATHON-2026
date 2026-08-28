@@ -1,0 +1,15 @@
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+*.log
+
+# cache ของไฟล์ที่ดาวน์โหลดมา ~64 MB — สร้างใหม่ได้ด้วย `node src/cli.js build`
+# ไม่เอาขึ้น git เพราะใหญ่และเป็นสำเนาของข้อมูลสาธารณะที่ดึงซ้ำได้
+data/raw/
+
+# ชุดเทรน ~36 MB — สร้างใหม่ได้จาก cache ข้างบนภายในไม่กี่นาที
+data/processed/panel.csv
+
+# ที่เหลือใน data/processed/ (feature_spec.json, hotspots.csv) เก็บไว้
+# และ train/artifacts/ ก็เก็บด้วย ทีมจะได้ export ใหม่ได้โดยไม่ต้องเทรนซ้ำ

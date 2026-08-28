@@ -1,0 +1,542 @@
+{
+  "features": [
+    "dow",
+    "month",
+    "doy_sin",
+    "doy_cos",
+    "days_since_start",
+    "precip_mm",
+    "rain_mm",
+    "precip_hours",
+    "temp_max",
+    "temp_min",
+    "wind_max",
+    "is_rainy",
+    "is_heavy_rain",
+    "rain_lag1",
+    "rain_3d_sum",
+    "is_public_holiday",
+    "is_observance",
+    "is_weekend",
+    "is_holiday_eve",
+    "is_songkran",
+    "is_newyear",
+    "is_seven_dangerous_days",
+    "day_off_run_length",
+    "is_long_weekend",
+    "days_to_next_holiday",
+    "days_since_prev_holiday",
+    "highway_km",
+    "vehicle_km",
+    "avg_lanes",
+    "pct_curve_prev",
+    "pct_slope_prev",
+    "pct_junction_prev",
+    "population",
+    "area_km2",
+    "log_population",
+    "motorcycle_per_capita",
+    "vehicle_density",
+    "road_km_per_area",
+    "acc_roll7_prev",
+    "acc_roll28_prev",
+    "acc_same_dow_mean_prev"
+  ],
+  "n_features": 41,
+  "algorithms": {
+    "xgboost": {
+      "algo": "xgboost",
+      "n_features": 41,
+      "best_iteration": 170,
+      "tuned_threshold": 0.32000000000000006,
+      "splits": {
+        "valid": {
+          "rows": 28182,
+          "positive_rate": 0.4324391455538997,
+          "model_at_0.5": {
+            "roc_auc": 0.7558960368887329,
+            "pr_auc": 0.7248437355514596,
+            "brier": 0.1940835863351822,
+            "threshold": 0.5,
+            "accuracy": 0.7017245050031935,
+            "precision": 0.7271416556530097,
+            "recall": 0.496594732091573,
+            "f1": 0.5901511457825451,
+            "confusion": {
+              "tn": 13724,
+              "fp": 2271,
+              "fn": 6135,
+              "tp": 6052
+            }
+          },
+          "model_at_tuned": {
+            "roc_auc": 0.7558960368887329,
+            "pr_auc": 0.7248437355514596,
+            "brier": 0.1940835863351822,
+            "threshold": 0.32000000000000006,
+            "accuracy": 0.6458732524306294,
+            "precision": 0.5636499971159947,
+            "recall": 0.8018380241240666,
+            "f1": 0.6619699227746918,
+            "confusion": {
+              "tn": 8430,
+              "fp": 7565,
+              "fn": 2415,
+              "tp": 9772
+            }
+          },
+          "baseline_province": {
+            "roc_auc": 0.7242073370911917,
+            "pr_auc": 0.687525044884315,
+            "brier": 0.20607216431266095,
+            "threshold": 0.5,
+            "accuracy": 0.6736569441487474,
+            "precision": 0.6856681569796323,
+            "recall": 0.4530237137933864,
+            "f1": 0.545580315232966,
+            "confusion": {
+              "tn": 13464,
+              "fp": 2531,
+              "fn": 6666,
+              "tp": 5521
+            }
+          },
+          "baseline_province_dow": {
+            "roc_auc": 0.7192670624356359,
+            "pr_auc": 0.684911449211391,
+            "brier": 0.20768046148128086,
+            "threshold": 0.5,
+            "accuracy": 0.6700730963026045,
+            "precision": 0.6615952567401275,
+            "recall": 0.4852711906129482,
+            "f1": 0.5598788223042697,
+            "confusion": {
+              "tn": 12970,
+              "fp": 3025,
+              "fn": 6273,
+              "tp": 5914
+            }
+          }
+        },
+        "test": {
+          "rows": 28105,
+          "positive_rate": 0.4366482832236257,
+          "model_at_0.5": {
+            "roc_auc": 0.7438118936724751,
+            "pr_auc": 0.7128253025858754,
+            "brier": 0.19953612983226776,
+            "threshold": 0.5,
+            "accuracy": 0.6923679060665362,
+            "precision": 0.7164517669531996,
+            "recall": 0.4889993481095176,
+            "f1": 0.5812669507942658,
+            "confusion": {
+              "tn": 13458,
+              "fp": 2375,
+              "fn": 6271,
+              "tp": 6001
+            }
+          },
+          "model_at_tuned": {
+            "roc_auc": 0.7438118936724751,
+            "pr_auc": 0.7128253025858754,
+            "brier": 0.19953612983226776,
+            "threshold": 0.32000000000000006,
+            "accuracy": 0.6412382138409536,
+            "precision": 0.563593050955784,
+            "recall": 0.7904172099087353,
+            "f1": 0.6580063087202794,
+            "confusion": {
+              "tn": 8322,
+              "fp": 7511,
+              "fn": 2572,
+              "tp": 9700
+            }
+          },
+          "baseline_province": {
+            "roc_auc": 0.7106339547448923,
+            "pr_auc": 0.6771870538425739,
+            "brier": 0.21143456655935544,
+            "threshold": 0.5,
+            "accuracy": 0.6642590286425902,
+            "precision": 0.6765877957658779,
+            "recall": 0.44271512385919165,
+            "f1": 0.5352182051029455,
+            "confusion": {
+              "tn": 13236,
+              "fp": 2597,
+              "fn": 6839,
+              "tp": 5433
+            }
+          },
+          "baseline_province_dow": {
+            "roc_auc": 0.7049901721323553,
+            "pr_auc": 0.6735005964170422,
+            "brier": 0.21324781622123076,
+            "threshold": 0.5,
+            "accuracy": 0.6588151574452944,
+            "precision": 0.6504429740944264,
+            "recall": 0.4726205997392438,
+            "f1": 0.5474538675727972,
+            "confusion": {
+              "tn": 12716,
+              "fp": 3117,
+              "fn": 6472,
+              "tp": 5800
+            }
+          }
+        },
+        "holdout": {
+          "rows": 9240,
+          "positive_rate": 0.4595238095238095,
+          "model_at_0.5": {
+            "roc_auc": 0.7566304482949016,
+            "pr_auc": 0.7410699373747962,
+            "brier": 0.19693219661712646,
+            "threshold": 0.5,
+            "accuracy": 0.6967532467532468,
+            "precision": 0.7261904761904762,
+            "recall": 0.54592557701366,
+            "f1": 0.6232858295240656,
+            "confusion": {
+              "tn": 4120,
+              "fp": 874,
+              "fn": 1928,
+              "tp": 2318
+            }
+          },
+          "model_at_tuned": {
+            "roc_auc": 0.7566304482949016,
+            "pr_auc": 0.7410699373747962,
+            "brier": 0.19693219661712646,
+            "threshold": 0.32000000000000006,
+            "accuracy": 0.6404761904761904,
+            "precision": 0.5754655341391702,
+            "recall": 0.8297220913801224,
+            "f1": 0.6795910493827161,
+            "confusion": {
+              "tn": 2395,
+              "fp": 2599,
+              "fn": 723,
+              "tp": 3523
+            }
+          },
+          "baseline_province": {
+            "roc_auc": 0.7024313302199097,
+            "pr_auc": 0.6832973834658934,
+            "brier": 0.21777061557320518,
+            "threshold": 0.5,
+            "accuracy": 0.6413419913419913,
+            "precision": 0.6765151515151515,
+            "recall": 0.42063118228921337,
+            "f1": 0.5187336625036305,
+            "confusion": {
+              "tn": 4140,
+              "fp": 854,
+              "fn": 2460,
+              "tp": 1786
+            }
+          },
+          "baseline_province_dow": {
+            "roc_auc": 0.6980962411606126,
+            "pr_auc": 0.6817961547729466,
+            "brier": 0.21907103751621512,
+            "threshold": 0.5,
+            "accuracy": 0.6428571428571429,
+            "precision": 0.6613233287858117,
+            "recall": 0.45666509656146964,
+            "f1": 0.540261911395932,
+            "confusion": {
+              "tn": 4001,
+              "fp": 993,
+              "fn": 2307,
+              "tp": 1939
+            }
+          }
+        }
+      },
+      "beats_baseline": true,
+      "count_model": {
+        "best_iteration": 362,
+        "test_poisson_deviance": 1.1258682012557983,
+        "test_mae": 0.7653646629683447,
+        "baseline_mae": 0.943862646749278
+      },
+      "top_features": {
+        "acc_roll28_prev": 0.20840290188789368,
+        "is_seven_dangerous_days": 0.10566623508930206,
+        "acc_same_dow_mean_prev": 0.06899271160364151,
+        "is_newyear": 0.06670277565717697,
+        "vehicle_km": 0.06618239730596542,
+        "acc_roll7_prev": 0.05875968560576439,
+        "is_songkran": 0.041844841092824936,
+        "day_off_run_length": 0.017667820677161217,
+        "days_since_start": 0.01605299487709999,
+        "is_long_weekend": 0.015109937638044357,
+        "area_km2": 0.015086769126355648,
+        "population": 0.01486914698034525,
+        "motorcycle_per_capita": 0.01470242626965046,
+        "highway_km": 0.014069984667003155,
+        "log_population": 0.013700323179364204,
+        "doy_cos": 0.013383552432060242,
+        "avg_lanes": 0.013101547956466675,
+        "is_observance": 0.012594622559845448,
+        "vehicle_density": 0.012433438561856747,
+        "pct_junction_prev": 0.012161330319941044,
+        "pct_curve_prev": 0.012058883905410767,
+        "precip_hours": 0.011793381534516811,
+        "doy_sin": 0.011787604540586472,
+        "road_km_per_area": 0.011716257780790329,
+        "pct_slope_prev": 0.011442488059401512
+      },
+      "shap": {
+        "rows_analysed": 28105,
+        "by_group": {
+          "ประวัติอุบัติเหตุ": {
+            "mean_abs_shap": 0.6224548667669296,
+            "features": [
+              "acc_roll7_prev",
+              "acc_roll28_prev",
+              "acc_same_dow_mean_prev"
+            ],
+            "percent": 43.952889531359574
+          },
+          "เวลา/ฤดูกาล": {
+            "mean_abs_shap": 0.24433333449997008,
+            "features": [
+              "dow",
+              "month",
+              "doy_sin",
+              "doy_cos",
+              "days_since_start"
+            ],
+            "percent": 17.252907212189978
+          },
+          "ลักษณะเส้นทาง": {
+            "mean_abs_shap": 0.21325724758207798,
+            "features": [
+              "highway_km",
+              "vehicle_km",
+              "avg_lanes",
+              "pct_curve_prev",
+              "pct_slope_prev",
+              "pct_junction_prev",
+              "road_km_per_area"
+            ],
+            "percent": 15.058557246764327
+          },
+          "เทศกาล/วันหยุด": {
+            "mean_abs_shap": 0.156740345119033,
+            "features": [
+              "is_public_holiday",
+              "is_observance",
+              "is_weekend",
+              "is_holiday_eve",
+              "is_songkran",
+              "is_newyear",
+              "is_seven_dangerous_days",
+              "day_off_run_length",
+              "is_long_weekend",
+              "days_to_next_holiday",
+              "days_since_prev_holiday"
+            ],
+            "percent": 11.067776062073273
+          },
+          "การเปิดรับความเสี่ยง": {
+            "mean_abs_shap": 0.1016495069488883,
+            "features": [
+              "population",
+              "area_km2",
+              "log_population",
+              "motorcycle_per_capita",
+              "vehicle_density"
+            ],
+            "percent": 7.177692373179825
+          },
+          "สภาพอากาศ": {
+            "mean_abs_shap": 0.07775118271820247,
+            "features": [
+              "precip_mm",
+              "rain_mm",
+              "precip_hours",
+              "temp_max",
+              "temp_min",
+              "wind_max",
+              "is_rainy",
+              "is_heavy_rain",
+              "rain_lag1",
+              "rain_3d_sum"
+            ],
+            "percent": 5.4901798144752965
+          }
+        },
+        "per_feature": {
+          "acc_roll28_prev": {
+            "mean_abs_shap": 0.3388759195804596,
+            "percent": 23.92876434326172
+          },
+          "acc_same_dow_mean_prev": {
+            "mean_abs_shap": 0.20676705241203308,
+            "percent": 14.60027027130127
+          },
+          "days_since_start": {
+            "mean_abs_shap": 0.1834886223077774,
+            "percent": 12.95652961730957
+          },
+          "vehicle_km": {
+            "mean_abs_shap": 0.13093887269496918,
+            "percent": 9.245878219604492
+          },
+          "is_seven_dangerous_days": {
+            "mean_abs_shap": 0.08750448375940323,
+            "percent": 6.178881645202637
+          },
+          "acc_roll7_prev": {
+            "mean_abs_shap": 0.07681189477443695,
+            "percent": 5.423854827880859
+          },
+          "doy_cos": {
+            "mean_abs_shap": 0.029607072472572327,
+            "percent": 2.0906195640563965
+          },
+          "population": {
+            "mean_abs_shap": 0.027436446398496628,
+            "percent": 1.9373470544815063
+          },
+          "area_km2": {
+            "mean_abs_shap": 0.024307677522301674,
+            "percent": 1.716417908668518
+          },
+          "highway_km": {
+            "mean_abs_shap": 0.023731015622615814,
+            "percent": 1.6756985187530518
+          },
+          "day_off_run_length": {
+            "mean_abs_shap": 0.023489492014050484,
+            "percent": 1.6586440801620483
+          },
+          "motorcycle_per_capita": {
+            "mean_abs_shap": 0.023112891241908073,
+            "percent": 1.6320513486862183
+          },
+          "days_to_next_holiday": {
+            "mean_abs_shap": 0.02015499398112297,
+            "percent": 1.4231878519058228
+          },
+          "vehicle_density": {
+            "mean_abs_shap": 0.01893593557178974,
+            "percent": 1.337107539176941
+          },
+          "doy_sin": {
+            "mean_abs_shap": 0.018446477130055428,
+            "percent": 1.3025457859039307
+          },
+          "precip_hours": {
+            "mean_abs_shap": 0.0181062463670969,
+            "percent": 1.2785212993621826
+          },
+          "precip_mm": {
+            "mean_abs_shap": 0.016787126660346985,
+            "percent": 1.185375452041626
+          },
+          "road_km_per_area": {
+            "mean_abs_shap": 0.015199159272015095,
+            "percent": 1.073245644569397
+          },
+          "avg_lanes": {
+            "mean_abs_shap": 0.014451769180595875,
+            "percent": 1.0204708576202393
+          },
+          "temp_min": {
+            "mean_abs_shap": 0.01100443210452795,
+            "percent": 0.7770468592643738
+          },
+          "pct_junction_prev": {
+            "mean_abs_shap": 0.010125289671123028,
+            "percent": 0.714968740940094
+          },
+          "pct_slope_prev": {
+            "mean_abs_shap": 0.009784209541976452,
+            "percent": 0.6908842921257019
+          },
+          "dow": {
+            "mean_abs_shap": 0.009298991411924362,
+            "percent": 0.6566219925880432
+          },
+          "days_since_prev_holiday": {
+            "mean_abs_shap": 0.00917888805270195,
+            "percent": 0.6481412053108215
+          },
+          "pct_curve_prev": {
+            "mean_abs_shap": 0.00902693159878254,
+            "percent": 0.6374112367630005
+          },
+          "rain_lag1": {
+            "mean_abs_shap": 0.007974477484822273,
+            "percent": 0.5630951523780823
+          },
+          "log_population": {
+            "mean_abs_shap": 0.007856556214392185,
+            "percent": 0.5547685027122498
+          },
+          "temp_max": {
+            "mean_abs_shap": 0.007710900157690048,
+            "percent": 0.5444834232330322
+          },
+          "wind_max": {
+            "mean_abs_shap": 0.0071738893166184425,
+            "percent": 0.5065639019012451
+          },
+          "rain_3d_sum": {
+            "mean_abs_shap": 0.006384546402841806,
+            "percent": 0.4508266746997833
+          },
+          "is_holiday_eve": {
+            "mean_abs_shap": 0.005466621369123459,
+            "percent": 0.3860100209712982
+          },
+          "is_weekend": {
+            "mean_abs_shap": 0.00411920016631484,
+            "percent": 0.2908656597137451
+          },
+          "is_songkran": {
+            "mean_abs_shap": 0.00392097607254982,
+            "percent": 0.276868611574173
+          },
+          "month": {
+            "mean_abs_shap": 0.0034921711776405573,
+            "percent": 0.246589794754982
+          },
+          "rain_mm": {
+            "mean_abs_shap": 0.0026095642242580652,
+            "percent": 0.18426699936389923
+          },
+          "is_newyear": {
+            "mean_abs_shap": 0.0012498865835368633,
+            "percent": 0.08825720846652985
+          },
+          "is_long_weekend": {
+            "mean_abs_shap": 0.0007885241066105664,
+            "percent": 0.05567939579486847
+          },
+          "is_public_holiday": {
+            "mean_abs_shap": 0.000502062845043838,
+            "percent": 0.035451747477054596
+          },
+          "is_observance": {
+            "mean_abs_shap": 0.00036521616857498884,
+            "percent": 0.02578870765864849
+          },
+          "is_rainy": {
+            "mean_abs_shap": 0.0,
+            "percent": 0.0
+          },
+          "is_heavy_rain": {
+            "mean_abs_shap": 0.0,
+            "percent": 0.0
+          }
+        }
+      }
+    }
+  }
+}
