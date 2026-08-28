@@ -1050,6 +1050,21 @@ window.UI = (function () {
     $('#setVibrate').checked = window.Alerts.settings.vibrate;
     $('#setSim').checked = window.Store.state.simulating;
     $('#setRealMap').checked = window.MapView.getStyleMode() !== 'plain';
+
+    /*
+     * เสียงไทยไม่ได้มีทุกเครื่อง — Windows ต้องลงชุดภาษาไทยก่อน
+     * ถ้าไม่บอก ผู้ใช้จะเปิดสวิตช์แล้วไม่ได้ยินอะไร โดยไม่รู้ว่าเป็นที่เครื่องตัวเอง
+     */
+    const warn = $('#voiceWarn');
+    const status = window.Alerts.thaiVoiceStatus();
+    if (!window.Alerts.settings.voice || status !== false) {
+      warn.hidden = true;
+    } else {
+      warn.hidden = false;
+      warn.textContent =
+        'เครื่องนี้ยังไม่มีเสียงภาษาไทยติดตั้งอยู่ ระบบจะเตือนด้วยเสียงและการสั่นแทน — '
+        + 'บน Windows เพิ่มได้ที่ ตั้งค่า → เวลาและภาษา → ภาษา แล้วติดตั้งแพ็กเสียงภาษาไทย';
+    }
   }
 
   /* ---------- แท็บล่าง ---------- */
@@ -2097,7 +2112,21 @@ window.UI = (function () {
       if (e.target.checked) window.Alerts.ensureAudio();
       syncStatusButtons();
     });
-    $('#setVoice').addEventListener('change', (e) => window.Alerts.setSetting('voice', e.target.checked));
+    $('#setVoice').addEventListener('change', (e) => {
+      window.Alerts.setSetting('voice', e.target.checked);
+      syncSettings(); // เปิดสวิตช์แล้วต้องรู้ทันทีว่าเครื่องนี้มีเสียงไทยไหม
+    });
+
+    /*
+     * Chrome คืนรายการเสียงเป็น array ว่างในครั้งแรก แล้วค่อยยิง voiceschanged ตามมา
+     * ถ้าไม่ฟัง event นี้ หน้าตั้งค่าจะค้างอยู่กับข้อมูลตอนเปิดหน้า
+     * แล้วอาจเตือนว่า "ไม่มีเสียงไทย" ทั้งที่มี หรือกลับกัน
+     */
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.addEventListener('voiceschanged', () => {
+        if (!$('#viewSettings').hidden) syncSettings();
+      });
+    }
     $('#setVibrate').addEventListener('change', (e) => window.Alerts.setSetting('vibrate', e.target.checked));
 
     $('#alertClose').addEventListener('click', hideAlert);

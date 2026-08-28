@@ -308,13 +308,58 @@ window.Alerts = (function () {
     }
   }
 
+  /* ---------- เสียงพูดภาษาไทย ---------- */
+
+  /*
+   * ต้องเลือก voice ให้ตรง ๆ ไม่ใช่แค่ตั้ง utter.lang
+   *
+   * utter.lang เป็นเพียงคำใบ้ ถ้าไม่ระบุ voice เบราว์เซอร์จะหยิบเสียงตั้งต้น
+   * ซึ่งมักเป็นภาษาอังกฤษ แล้วอ่านข้อความไทยออกมาเป็นเสียงมั่วหรือเงียบไปเลย
+   *
+   * getVoices() ยังคืน array ว่างในครั้งแรกบน Chrome จนกว่า voiceschanged จะยิง
+   * จึงต้องผูก event ไว้แล้วเลือกใหม่ทุกครั้งที่รายการเปลี่ยน
+   */
+  let thaiVoice = null;
+  let voicesReady = false;
+
+  function pickThaiVoice() {
+    if (!('speechSynthesis' in window)) return;
+    const all = window.speechSynthesis.getVoices();
+    if (!all.length) return;
+
+    voicesReady = true;
+    const thai = all.filter((v) => (v.lang || '').toLowerCase().startsWith('th'));
+
+    // เสียงที่ติดตั้งในเครื่องพูดได้ทันทีแม้ออฟไลน์ จึงเลือกก่อนเสียงจากคลาวด์
+    thaiVoice = thai.find((v) => v.localService) || thai[0] || null;
+  }
+
+  if ('speechSynthesis' in window) {
+    pickThaiVoice();
+    window.speechSynthesis.addEventListener('voiceschanged', pickThaiVoice);
+  }
+
+  /** มีเสียงไทยให้ใช้ไหม — null = ยังไม่รู้ (รายการเสียงยังไม่มา) */
+  function thaiVoiceStatus() {
+    if (!('speechSynthesis' in window)) return false;
+    if (!voicesReady) return null;
+    return thaiVoice !== null;
+  }
+
   function speak(text) {
     if (!('speechSynthesis' in window)) return;
     try {
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'th-TH';
-      utter.rate = 1.05;
+
+      if (thaiVoice) utter.voice = thaiVoice;
+      // ตั้ง lang ไว้เสมอ เผื่อเครื่องที่เลือก voice ไม่ได้แต่ยังรองรับผ่าน lang
+      utter.lang = thaiVoice?.lang || 'th-TH';
+
+      // ไทยพูดเร็วกว่าอังกฤษอยู่แล้ว เร่งมากจะฟังไม่ทันตอนขับรถ
+      utter.rate = 1.0;
+      utter.pitch = 1.0;
+
       window.speechSynthesis.speak(utter);
     } catch (_) { /* บางเบราว์เซอร์บล็อกก่อนมี user gesture */ }
   }
@@ -333,6 +378,7 @@ window.Alerts = (function () {
     notify,
     ensureAudio,
     speak,
+    thaiVoiceStatus,
     get isSimulating() { return !!simTimer; },
     get isTracking() { return watchId != null; },
     set onAlert(fn) { onAlert = fn; },

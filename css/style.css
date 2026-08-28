@@ -3343,3 +3343,13 @@ body.picking .phone > #map::after {
   color: var(--accent-2);
   background: var(--accent-2-soft);
 }
+
+/* คำเตือนในหน้าตั้งค่า — ใช้เมื่อเครื่องขาดความสามารถบางอย่าง ไม่ใช่เมื่อผู้ใช้ทำผิด */
+.hint--warn {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 28%, transparent);
+}
