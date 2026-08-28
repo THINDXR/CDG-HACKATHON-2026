@@ -70,8 +70,13 @@ window.RouteRisk = (function () {
     return CFG.SEVERITY[report.severity].weight * trust * freshness(report);
   }
 
+  /*
+   * ระดับบนสุดใช้คำว่า "ระวังให้มาก" ไม่ใช่ "อันตรายมาก" เพราะคะแนนเส้นทาง
+   * รวมผลจากโมเดลพยากรณ์และสถิติย้อนหลัง ซึ่งเป็นการคาดการณ์
+   * ไม่ใช่การยืนยันว่ามีอันตรายรออยู่จริงบนถนนเส้นนั้นตอนนี้
+   */
   const LEVELS = [
-    { min: 70, key: 'critical', label: 'อันตรายมาก', color: '#ff3b30' },
+    { min: 70, key: 'critical', label: 'ระวังให้มาก', color: '#ff3b30' },
     { min: 45, key: 'high', label: 'เสี่ยงสูง', color: '#ff9f0a' },
     { min: 20, key: 'medium', label: 'ต้องระวัง', color: '#d4a017' },
     { min: 0, key: 'low', label: 'ปลอดภัย', color: '#30d158' },

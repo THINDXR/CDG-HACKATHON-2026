@@ -409,11 +409,24 @@ window.UI = (function () {
    * แต่สาเหตุคือสิ่งเดียวที่บอกว่าจะระวังอะไร
    */
   function causeBlock(h, cat) {
-    if (!h.cause) return '';
+    /*
+     * ประเภทที่จัดจากลักษณะทางหรือช่วงเวลา (โค้ง/แยก/ลาดชัน/ทัศนวิสัย)
+     * มีคำอธิบายของตัวเองว่าปัจจัยตรงนี้คืออะไร
+     * ส่วนประเภทที่เหลือใช้สาเหตุจริงที่ต้นทางบันทึกไว้
+     *
+     * ป้ายกำกับต่างกันตามที่มา จะได้ไม่อ้างว่าข้อความนี้มาจากสถิติทั้งที่ไม่ใช่
+     */
+    const fromCategory = !!cat.cause;
+    // ข้อความดิบจากต้นทางเป็นภาษาราชการและมีคู่ซ้ำ — จัดให้สั้นและตรงประเด็นก่อน
+    const cause = fromCategory ? cat.cause : window.Hotspots.cleanCause(h.cause);
+    if (!cause) return '';
+
     return `
       <div class="hotspot-cause" style="--cat-color:${cat.color}">
-        <span class="hotspot-cause__label">สาเหตุที่พบบ่อยที่สุด</span>
-        <strong class="hotspot-cause__text">${escapeHtml(h.cause)}</strong>
+        <span class="hotspot-cause__label">${
+          fromCategory ? 'ปัจจัยที่ทำให้เกิดเหตุ' : 'สาเหตุที่พบบ่อยที่สุด'
+        }</span>
+        <strong class="hotspot-cause__text">${escapeHtml(cause)}</strong>
       </div>`;
   }
 
@@ -1626,6 +1639,12 @@ window.UI = (function () {
     return Math.max(scored, 20);
   }
 
+  /*
+   * ตัดปลายคะแนนเส้นทางไว้ที่ 5-95 ด้วยเหตุผลเดียวกับคะแนนรอบตัว
+   * — มันคือการคาดการณ์ ไม่ใช่ความจริงที่วัดได้ จึงไม่ควรอ่านเป็น 0% หรือ 100%
+   */
+  const clampScore = (n) => Math.min(95, Math.max(5, n));
+
   function tripBlend(analysis) {
     const forecast = window.AIUI?.currentForecast?.() || null;
     const withStats = statRouteScore(analysis.score);
@@ -1633,7 +1652,7 @@ window.UI = (function () {
 
     if (!blended.adjusted && withStats === analysis.score) {
       return {
-        score: analysis.score,
+        score: clampScore(analysis.score),
         levelKey: analysis.level.key,
         levelLabel: analysis.level.label,
         color: analysis.level.color,
@@ -1647,7 +1666,7 @@ window.UI = (function () {
     if (!blended.adjusted) {
       const spots = window.Hotspots.routeHotspots();
       return {
-        score: blended.score,
+        score: clampScore(blended.score),
         levelKey: level.key,
         levelLabel: level.label,
         color: level.color,
@@ -1664,7 +1683,7 @@ window.UI = (function () {
     const direction = blended.delta > 0 ? 'เพิ่ม' : 'ลด';
 
     return {
-      score: blended.score,
+      score: clampScore(blended.score),
       levelKey: level.key,
       levelLabel: level.label,
       color: level.color,
