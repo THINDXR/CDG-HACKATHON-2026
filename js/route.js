@@ -85,11 +85,30 @@ window.Route = (function () {
    * @param {Array<[number, number]>} waypoints
    */
   async function getRouteVia(waypoints) {
+    const list = await request(waypoints, 0);
+    return list[0];
+  }
+
+  /**
+   * ขอเส้นทางหลายเส้นให้เลือก (ต้นทาง-ปลายทางเท่านั้น)
+   *
+   * เราไม่ได้สั่ง OSRM ให้ "เลี่ยง" อะไร — สั่งไม่ได้อยู่แล้วบนเซิร์ฟเวอร์สาธารณะ
+   * แต่ขอมาหลายเส้นแล้วให้ RouteRisk ให้คะแนนเอง แล้วเลือกเส้นที่เสี่ยงน้อยกว่า
+   *
+   * @returns {Promise<Array<object>>} เรียงตามที่ OSRM ให้มา (เส้นแรก = เร็วที่สุด)
+   */
+  async function getRoutes(from, to, { alternatives = 2 } = {}) {
+    return request([from, to], alternatives);
+  }
+
+  async function request(waypoints, alternatives) {
     if (!waypoints || waypoints.length < 2) {
       throw new Error('ต้องมีอย่างน้อยจุดต้นทางกับปลายทาง');
     }
     const coords = waypoints.map((c) => `${c[0]},${c[1]}`).join(';');
-    const url = `${ENDPOINT}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=false`;
+    // OSRM ให้เส้นทางสำรองเฉพาะตอนมีสองจุดเท่านั้น มีจุดแวะเมื่อไหร่จะไม่ให้มา
+    const alt = alternatives > 0 && waypoints.length === 2 ? String(alternatives) : 'false';
+    const url = `${ENDPOINT}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=${alt}`;
 
     const res = await fetch(url);
     if (!res.ok) throw new Error(`เซิร์ฟเวอร์เส้นทางตอบกลับ ${res.status}`);
@@ -98,7 +117,7 @@ window.Route = (function () {
     if (data.code !== 'Ok' || !data.routes?.length) {
       throw new Error('หาเส้นทางไปจุดนี้ไม่ได้');
     }
-    return build(data.routes[0]);
+    return data.routes.map(build);
   }
 
   /**
@@ -198,5 +217,5 @@ window.Route = (function () {
     };
   }
 
-  return { getRoute, getRouteVia, progress };
+  return { getRoute, getRouteVia, getRoutes, progress };
 })();

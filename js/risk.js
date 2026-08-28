@@ -43,6 +43,33 @@ window.RouteRisk = (function () {
   // ระยะที่เริ่มเตือนล่วงหน้าก่อนถึงจุดเสี่ยงบนเส้นทาง (เมตร)
   const WARN_AHEAD_M = 500;
 
+  /*
+   * ประเภทที่ "ไม่เอามาคิดตอนหาเส้นทางเลี่ยง"
+   *
+   * ด่านตรวจไม่ใช่อันตรายบนถนน และการช่วยให้คนขับเลี่ยงด่านตรวจวัดแอลกอฮอล์
+   * ขัดกับเป้าหมายลดอุบัติเหตุของแอปโดยตรง จึงยังแสดงให้เห็นและยังเตือนตอนใกล้ถึง
+   * แต่ไม่นำมาเป็นเหตุผลในการเสนอให้เปลี่ยนเส้นทาง
+   */
+  const NOT_AVOIDABLE = new Set(['police']);
+
+  /*
+   * ความสดของรายงาน — อุบัติเหตุที่เพิ่งเกิด 20 นาทีที่แล้ว สำคัญกว่าที่แจ้งไว้ 11 ชั่วโมง
+   * ตอนแค่ "เตือน" ยังพอปล่อยได้ แต่ถ้าจะเอาไปสั่งให้คนขับอ้อมไปอีกหลายกิโล
+   * น้ำหนักต้องลดตามอายุ ไม่งั้นรายงานเก่าค้างจะทำให้เส้นทางเพี้ยนทั้งวัน
+   *
+   * สดใหม่ = 1.0 · 3 ชม. ≈ 0.55 · ครบ 12 ชม. (หมดอายุพอดี) ≈ 0.31
+   */
+  function freshness(report) {
+    const hours = Math.max(0, (Date.now() - report.createdAt) / 3600000);
+    return 0.3 + 0.7 * Math.exp(-hours / 3);
+  }
+
+  /** น้ำหนักของรายงานหนึ่งจุด = ความรุนแรง × ความน่าเชื่อถือ × ความสด */
+  function reportWeight(report) {
+    const trust = Math.max(0.4, (report.confirms + 1) / (report.confirms + report.denies + 1));
+    return CFG.SEVERITY[report.severity].weight * trust * freshness(report);
+  }
+
   const LEVELS = [
     { min: 70, key: 'critical', label: 'อันตรายมาก', color: '#ff3b30' },
     { min: 45, key: 'high', label: 'เสี่ยงสูง', color: '#ff9f0a' },
@@ -112,9 +139,7 @@ window.RouteRisk = (function () {
      */
     const roads = new Map();
     for (const p of points) {
-      const weight =
-        CFG.SEVERITY[p.report.severity].weight *
-        Math.max(0.4, (p.report.confirms + 1) / (p.report.confirms + p.report.denies + 1));
+      const weight = reportWeight(p.report);
 
       const entry = roads.get(p.road) || { road: p.road, count: 0, weight: 0, accidents: 0, points: [] };
       entry.count += 1;
@@ -134,17 +159,27 @@ window.RouteRisk = (function () {
 
     // คะแนนรวมของเส้นทาง = ความหนาแน่นของจุดเสี่ยงต่อ 10 กม.
     const km = Math.max(0.3, route.distance / 1000);
-    const totalWeight = roadList.reduce((sum, r) => sum + r.weight + r.accidents * 1.5, 0);
-    const density = (totalWeight / km) * 10 * vehicle.riskFactor;
-    const score = Math.round(Math.min(100, 100 * (1 - Math.exp(-density / 12))));
+    const scoreFrom = (list) => {
+      const total = list.reduce((sum, p) => sum + reportWeight(p.report) +
+        (p.report.type === 'accident' ? 1.5 : 0), 0);
+      const density = (total / km) * 10 * vehicle.riskFactor;
+      return Math.round(Math.min(100, 100 * (1 - Math.exp(-density / 12))));
+    };
+
+    const score = scoreFrom(points);
+    // คะแนนที่ใช้ตัดสินใจเลี่ยงเส้นทาง — ตัดด่านตรวจออก (ดูคำอธิบายที่ NOT_AVOIDABLE)
+    const avoidable = points.filter((p) => !NOT_AVOIDABLE.has(p.report.type));
+    const avoidScore = scoreFrom(avoidable);
 
     const duration = route.duration * vehicle.timeFactor;
 
     return {
+      route,
       vehicle,
       points,
       roads: roadList,
       score,
+      avoidScore,
       level: levelFor(score),
       distance: route.distance,
       duration,
@@ -173,12 +208,101 @@ window.RouteRisk = (function () {
     return null;
   }
 
+  /* ---------- เปรียบเทียบเส้นทางเพื่อเสนอทางเลี่ยง ---------- */
+
+  // ต้องปลอดภัยกว่าเดิมอย่างน้อยเท่านี้ ถึงจะคุ้มให้ผู้ใช้เปลี่ยนเส้นทาง (แต้ม)
+  const MIN_GAIN = 15;
+  // และต้องไม่ช้ากว่าเส้นที่เร็วที่สุดเกินสัดส่วนนี้
+  const MAX_SLOWER = 0.2;
+
+  /**
+   * เลือกเส้นทางที่ควรแนะนำจากหลายเส้น
+   *
+   * ตั้งใจไม่เปลี่ยนเส้นทางให้เองเงียบ ๆ — คืนแค่ "ข้อเสนอ" ให้ UI ไปถามผู้ใช้
+   * เพราะคะแนนความเสี่ยงของเรายังเป็นค่าประมาณ การบังคับให้คนอ้อมไปหลายกิโล
+   * ด้วยตัวเลขที่ยังไม่ได้พิสูจน์นั้นหนักเกินกว่าที่ข้อมูลจะรองรับได้
+   *
+   * @param {Array<object>} analyses ผลจาก analyze() ของแต่ละเส้น (ตัวแรก = เร็วที่สุด)
+   * @returns {{fastest: object, safest: object, shouldSwitch: boolean, gain: number, extraSeconds: number}}
+   */
+  function compare(analyses) {
+    const fastest = analyses[0];
+    let safest = fastest;
+
+    for (const a of analyses) {
+      const slower = (a.duration - fastest.duration) / Math.max(1, fastest.duration);
+      if (slower > MAX_SLOWER) continue;                 // อ้อมไกลเกินไป
+      if (a.avoidScore < safest.avoidScore) safest = a;
+    }
+
+    const gain = fastest.avoidScore - safest.avoidScore;
+    return {
+      fastest,
+      safest,
+      gain,
+      extraSeconds: safest.duration - fastest.duration,
+      shouldSwitch: safest !== fastest && gain >= MIN_GAIN,
+      minGain: MIN_GAIN,
+    };
+  }
+
+  /* ---------- ระบายสีเส้นทางตามความเสี่ยงของแต่ละช่วง ---------- */
+
+  // ช่วงถนนรอบจุดเสี่ยงที่ถือว่า "ได้รับผลกระทบ" (เมตร ก่อนและหลังจุด)
+  const SEGMENT_SPREAD_M = 180;
+
+  const LEVEL_RANK = { low: 0, medium: 1, high: 2, critical: 3 };
+
+  /**
+   * หั่นเส้นทางเป็นช่วง ๆ พร้อมระดับความเสี่ยงของช่วงนั้น
+   * เอาไปให้แผนที่ระบายสีแบบเดียวกับที่ Google Maps ระบายสีรถติด
+   * ต่างกันตรงที่ของเราบอก "ช่วงนี้อันตราย" ไม่ใช่ "ช่วงนี้รถติด"
+   *
+   * @returns {Array<{coordinates: Array, level: string}>}
+   */
+  function segments(analysis) {
+    const route = analysis?.route;
+    if (!route?.coordinates?.length) return [];
+
+    // ให้ระดับกับทุก vertex ตามจุดเสี่ยงที่อยู่ใกล้ในแนวเส้นทาง
+    const levels = new Array(route.coordinates.length).fill('low');
+
+    for (const p of analysis.points) {
+      // จุดที่เสี่ยงน้อยและเก่ามากแล้ว ไม่ต้องย้อมสีทั้งช่วงถนน
+      const w = reportWeight(p.report);
+      const level = w >= 2.2 ? 'high' : w >= 1.1 ? 'medium' : 'low';
+      if (level === 'low') continue;
+
+      for (let i = 0; i < route.coordinates.length; i++) {
+        if (Math.abs((route.cumulative[i] || 0) - p.along) > SEGMENT_SPREAD_M) continue;
+        if (LEVEL_RANK[level] > LEVEL_RANK[levels[i]]) levels[i] = level;
+      }
+    }
+
+    // รวม vertex ที่ระดับเดียวกันติดกันให้เป็นช่วงเดียว
+    const out = [];
+    let start = 0;
+    for (let i = 1; i <= levels.length; i++) {
+      if (i < levels.length && levels[i] === levels[start]) continue;
+      out.push({
+        level: levels[start],
+        // ต่อจุดแรกของช่วงถัดไปเข้ามาด้วย เส้นจะได้ไม่ขาดตรงรอยต่อ
+        coordinates: route.coordinates.slice(start, Math.min(i + 1, levels.length)),
+      });
+      start = i;
+    }
+    return out.filter((s) => s.coordinates.length > 1);
+  }
+
   return {
     VEHICLES,
     LEVELS,
     analyze,
+    compare,
+    segments,
     upcoming,
     levelFor,
+    reportWeight,
     WARN_AHEAD_M,
   };
 })();

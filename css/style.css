@@ -2003,6 +2003,68 @@ body.picking .phone > #map::after {
 }
 .vehicle-card.is-active .vehicle-card__icon { color: var(--accent); }
 
+/* ตัวเลือกเส้นทาง — โผล่เมื่อมีเส้นทางสำรองให้เทียบ */
+.route-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.route-opt {
+  --opt-color: var(--ok);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.route-opt.is-active {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: var(--accent-soft);
+}
+
+.route-opt__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.route-opt__main strong { font-size: 15.5px; font-weight: 800; }
+.route-opt__main small { font-size: 11.5px; color: var(--text-dim); }
+
+.route-opt__badge {
+  flex: none;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text-dim);
+}
+.route-opt__badge--safe {
+  background: color-mix(in srgb, var(--ok) 20%, transparent);
+  color: var(--ok);
+}
+
+.route-opt__score {
+  flex: none;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--opt-color);
+  font-variant-numeric: tabular-nums;
+}
+.route-opt__score small { font-size: 10px; font-weight: 700; opacity: 0.7; }
+
+.route-tip {
+  margin: -8px 0 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.route-tip strong { color: var(--ok); font-weight: 800; }
+
 .trip-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

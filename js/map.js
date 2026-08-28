@@ -348,7 +348,17 @@ window.MapView = (function () {
         source: 'nav-route',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': '#8b5cf6',
+          /*
+           * สีตามระดับความเสี่ยงของช่วงถนนนั้น (คล้ายเส้นสีของ Google Maps
+           * แต่ของเราหมายถึง "ช่วงนี้อันตราย" ไม่ใช่ "ช่วงนี้รถติด")
+           * ช่วงที่ไม่มีจุดเสี่ยงใช้สีม่วงประจำโหมดนำทางตามเดิม
+           */
+          'line-color': [
+            'match', ['get', 'level'],
+            'high', '#ff3b30',
+            'medium', '#ff9f0a',
+            '#8b5cf6',
+          ],
           'line-width': ['interpolate', ['linear'], ['zoom'], 12, 5, 16, 14, 18, 22],
         },
       });
@@ -356,16 +366,40 @@ window.MapView = (function () {
   }
 
   /** วาด/ลบเส้นทางนำทาง — ส่ง null เพื่อล้าง */
-  function setNavRoute(coordinates) {
+  /**
+   * @param {Array} coordinates พิกัดตลอดเส้นทาง
+   * @param {Array} [segments] ช่วงถนนพร้อมระดับความเสี่ยง จาก RouteRisk.segments()
+   *   ถ้าไม่ส่งมา จะวาดเป็นเส้นม่วงเส้นเดียวตามเดิม
+   */
+  function setNavRoute(coordinates, segments) {
     if (!map) return;
     addNavRouteLayers();
     const src = map.getSource('nav-route');
     if (!src) return;
 
+    const empty = { type: 'FeatureCollection', features: [] };
+    const plain = coordinates && coordinates.length
+      ? {
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            properties: { level: 'low' },
+            geometry: { type: 'LineString', coordinates },
+          }],
+        }
+      : empty;
+
     src.setData(
-      coordinates && coordinates.length
-        ? { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } }
-        : { type: 'FeatureCollection', features: [] }
+      segments && segments.length
+        ? {
+            type: 'FeatureCollection',
+            features: segments.map((s) => ({
+              type: 'Feature',
+              properties: { level: s.level },
+              geometry: { type: 'LineString', coordinates: s.coordinates },
+            })),
+          }
+        : plain
     );
 
     if (destMarker) {

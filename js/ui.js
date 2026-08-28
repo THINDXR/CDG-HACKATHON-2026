@@ -340,6 +340,7 @@ window.UI = (function () {
     try {
       const route = await window.Navigate.start(from, dest, opts);
       $('#phone').classList.add('is-navigating');
+      const risky = window.RouteRisk.segments(window.Navigate.analysis);
       /*
        * การนำทางเกิดบนแผนที่เสมอ จึงต้องสลับกลับมาแท็บแผนที่ก่อน
        * ไม่งั้นถ้าสั่งเริ่มนำทางจากหน้าตั้งค่า/แดชบอร์ด (เช่นเปิดโหมดจำลอง)
@@ -349,7 +350,7 @@ window.UI = (function () {
       // เริ่มนำทาง = ล็อกกล้องไว้ที่ลูกศรก่อนเสมอ
       window.Store.setFollowing(true);
       setDetent('closed');
-      window.MapView.setNavRoute(route.coordinates);
+      window.MapView.setNavRoute(route.coordinates, risky);
 
       if (opts.skipOverview) {
         // โหมดจำลองเริ่มขับทันที ถ้ายังโชว์ภาพรวมอยู่กล้องจะถูกแย่งไปมา
@@ -1189,12 +1190,16 @@ window.UI = (function () {
   /* ---------- แผ่นสรุปการเดินทาง (เลือกพาหนะ + ความเสี่ยงรายถนน) ---------- */
 
   let tripPlace = null;     // จุดหมายที่กำลังดูอยู่
-  let tripRoute = null;     // เส้นทางที่คำนวณแล้ว (ใช้ซ้ำตอนกดเริ่มนำทาง)
+  let tripRoutes = [];      // เส้นทางทั้งหมดที่ OSRM ให้มา (ตัวแรก = เร็วที่สุด)
+  let tripPick = 0;         // ผู้ใช้เลือกเส้นไหนอยู่
   let tripVehicle = 'car';
+
+  const tripRoute = () => tripRoutes[tripPick] || null;
 
   async function openTripSheet(place) {
     tripPlace = place;
-    tripRoute = null;
+    tripRoutes = [];
+    tripPick = 0;
 
     $('#tripName').textContent = place.name;
     $('#tripDetail').textContent = place.detail || '';
@@ -1204,8 +1209,10 @@ window.UI = (function () {
     openOverlay('#tripSheet');
 
     try {
-      tripRoute = await window.Route.getRoute(origin(), [place.lng, place.lat]);
+      // ขอเส้นทางสำรองมาด้วย เพื่อเทียบว่ามีเส้นที่ปลอดภัยกว่าไหม
+      const routes = await window.Route.getRoutes(origin(), [place.lng, place.lat]);
       if (tripPlace !== place) return; // ผู้ใช้เปลี่ยนจุดหมายระหว่างรอ
+      tripRoutes = routes;
       $('#tripStart').disabled = false;
       renderTripBody();
     } catch (err) {
@@ -1215,7 +1222,8 @@ window.UI = (function () {
 
   function closeTripSheet() {
     tripPlace = null;
-    tripRoute = null;
+    tripRoutes = [];
+    tripPick = 0;
     closeOverlay('#tripSheet');
   }
 
@@ -1234,7 +1242,7 @@ window.UI = (function () {
       btn.addEventListener('click', () => {
         tripVehicle = v.key;
         renderVehiclePicker();
-        if (tripRoute) renderTripBody();
+        if (tripRoute()) renderTripBody();
       });
       box.appendChild(btn);
     }
@@ -1242,7 +1250,10 @@ window.UI = (function () {
 
   /** เวลา ระยะทาง ความเสี่ยงรวม และรายชื่อถนนเสี่ยงบนเส้นทางที่เลือก */
   function renderTripBody() {
-    const a = window.RouteRisk.analyze(tripRoute, tripVehicle);
+    const all = tripRoutes.map((r) => window.RouteRisk.analyze(r, tripVehicle));
+    const verdict = window.RouteRisk.compare(all);
+    const a = all[tripPick];
+
     const eta = new Date(Date.now() + a.duration * 1000)
       .toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 
@@ -1257,6 +1268,8 @@ window.UI = (function () {
       </li>`).join('');
 
     $('#tripBody').innerHTML = `
+      ${renderRouteChoices(all, verdict)}
+
       <div class="trip-stats">
         <div><span>เวลาเดินทาง</span><strong>${formatDuration(a.duration)}</strong></div>
         <div><span>ระยะทาง</span><strong>${U.formatDistance(a.distance)}</strong></div>
@@ -1281,6 +1294,54 @@ window.UI = (function () {
         <ul class="trip-roads">${roads}</ul>` : ''}
 
       <p class="trip-note">${escapeHtml(a.vehicle.note)} · นับจุดที่อยู่ห่างเส้นทางไม่เกิน ${a.corridor} ม.</p>`;
+
+    $$('#tripBody [data-route]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        tripPick = Number(btn.dataset.route);
+        renderTripBody();
+      });
+    });
+  }
+
+  /**
+   * ตัวเลือกเส้นทาง — โผล่เฉพาะตอน OSRM ให้เส้นทางสำรองมามากกว่าหนึ่งเส้น
+   *
+   * ตั้งใจไม่สลับเส้นทางให้เองเงียบ ๆ แค่ชี้ให้เห็นว่ามีเส้นที่ปลอดภัยกว่า
+   * แล้วให้ผู้ใช้ตัดสินใจ เพราะคะแนนความเสี่ยงของเรายังเป็นค่าประมาณ
+   */
+  function renderRouteChoices(all, verdict) {
+    if (all.length < 2) return '';
+
+    const fastest = all[0];
+    const rows = all.map((a, i) => {
+      const slower = a.duration - fastest.duration;
+      const badge = a === verdict.safest && verdict.safest !== fastest
+        ? '<em class="route-opt__badge route-opt__badge--safe">ปลอดภัยกว่า</em>'
+        : i === 0 ? '<em class="route-opt__badge">เร็วที่สุด</em>' : '';
+
+      return `
+        <button type="button" class="route-opt${i === tripPick ? ' is-active' : ''}"
+                data-route="${i}" style="--opt-color:${a.level.color}">
+          <span class="route-opt__main">
+            <strong>${formatDuration(a.duration)}</strong>
+            <small>${U.formatDistance(a.distance)}${
+              slower > 30 ? ` · ช้ากว่า ${formatDuration(slower)}` : ''
+            }</small>
+          </span>
+          ${badge}
+          <span class="route-opt__score">${a.score}<small>%</small></span>
+        </button>`;
+    }).join('');
+
+    const tip = verdict.shouldSwitch
+      ? `<p class="route-tip">มีเส้นที่เสี่ยงน้อยกว่า <strong>${verdict.gain}</strong> แต้ม
+         ${verdict.extraSeconds > 30 ? `แลกกับเวลาเพิ่ม ${formatDuration(verdict.extraSeconds)}` : 'โดยไม่ช้าลงเลย'}</p>`
+      : '';
+
+    return `
+      <span class="field-label">เลือกเส้นทาง</span>
+      <div class="route-opts">${rows}</div>
+      ${tip}`;
   }
 
   /* ---------- แผ่นรายการแบบลากได้ ---------- */
@@ -1462,9 +1523,9 @@ window.UI = (function () {
       if (e.target.id === 'tripSheet') closeTripSheet();
     });
     $('#tripStart').addEventListener('click', () => {
-      if (!tripPlace || !tripRoute) return;
+      const preRoute = tripRoute();
+      if (!tripPlace || !preRoute) return;
       const dest = { lng: tripPlace.lng, lat: tripPlace.lat, label: tripPlace.name };
-      const preRoute = tripRoute;
       const vehicle = tripVehicle;
       closeTripSheet();
       startNavigation(dest, { vehicle, preRoute });

@@ -96,23 +96,29 @@
 
     window.Navigate.onChange = () => {
       window.UI.renderNav();
-      const route = window.Navigate.route;
-      window.MapView.setNavRoute(route ? route.coordinates : null);
 
       /*
-       * ระหว่างนำทาง แผนที่โชว์เฉพาะจุดเสี่ยงที่อยู่บนเส้นทางที่จะวิ่งผ่านจริง
-       * จุดอื่นทั้งเมืองไม่เกี่ยวกับการขับตอนนี้ มีแต่จะรกและดึงสายตา
-       *
-       * onChange ยิงทุกครั้งที่ตำแหน่งขยับ แต่ชุดจุดเปลี่ยนเฉพาะตอนเส้นทางเปลี่ยน
-       * (เริ่มนำทาง / คำนวณใหม่ / จบ) จึงเทียบตัวเส้นทางก่อนค่อยสั่งวาดใหม่
+       * onChange ยิงทุกครั้งที่ตำแหน่งขยับ แต่ทั้งเส้นทางบนแผนที่และชุดจุดเสี่ยง
+       * เปลี่ยนเฉพาะตอนเส้นทางเปลี่ยน (เริ่มนำทาง / คำนวณใหม่ / จบ)
+       * จึงเทียบตัวเส้นทางก่อน แล้วค่อยวาดใหม่ทีเดียว
        */
-      if (route !== filteredForRoute) {
-        filteredForRoute = route;
-        const points = window.Navigate.analysis?.points;
-        window.Store.setRouteFilter(
-          route && points ? points.map((p) => p.report.id) : null
-        );
-      }
+      const route = window.Navigate.route;
+      if (route === filteredForRoute) return;
+      filteredForRoute = route;
+
+      const analysis = window.Navigate.analysis;
+
+      // เส้นทางระบายสีตามความเสี่ยงของแต่ละช่วงถนน
+      window.MapView.setNavRoute(
+        route ? route.coordinates : null,
+        route ? window.RouteRisk.segments(analysis) : null
+      );
+
+      // และแผนที่โชว์เฉพาะจุดเสี่ยงที่อยู่บนเส้นทางที่จะวิ่งผ่านจริง
+      // จุดอื่นทั้งเมืองไม่เกี่ยวกับการขับตอนนี้ มีแต่จะรกและดึงสายตา
+      window.Store.setRouteFilter(
+        route && analysis?.points ? analysis.points.map((p) => p.report.id) : null
+      );
     };
 
     window.Navigate.onFinish = (dest) => {
