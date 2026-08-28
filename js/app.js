@@ -22,6 +22,15 @@
     wireMapControls();
     wireNavigation();
 
+    /*
+     * ประเมินความเสี่ยงของวันนี้ทันที ไม่รอ GPS
+     *
+     * โมเดลทำนายระดับจังหวัด จึงต้องอิงจังหวัดที่ผู้ใช้อยู่จริง ถ้ายังไม่รู้ตำแหน่ง
+     * ใช้จุดกึ่งกลางแผนที่แทน — ซึ่งก็คือบริเวณที่ผู้ใช้กำลังดูอยู่
+     * พอ GPS มาหรือผู้ใช้เลื่อนแผนที่ข้ามจังหวัด การ์ดจะอัปเดตตาม
+     */
+    window.AIUI.updateFor(forecastOrigin());
+
     window.MapView.onMarkerClick = (id) => {
       window.Store.select(id);
       // กดหมุดบนแผนที่ก็ให้แผ่นเปิดมาแสดงรายละเอียดเช่นเดียวกับกดจากรายการ
@@ -36,7 +45,19 @@
       // เปิดมาให้เห็นหมุดภัยทันที ไม่ต้องเลื่อนหาเอง
       window.MapView.fitToHazards();
       window.UI.renderList();
+      initHotspots();
       locateOnStart();
+
+      /*
+       * ยังไม่รู้ตำแหน่งจริง = ผู้ใช้กำลังสำรวจด้วยการเลื่อนแผนที่
+       * ทั้งความเสี่ยงรอบตัวและโมเดลพยากรณ์จึงต้องตามจุดที่กำลังดูอยู่
+       * (ถ้าเปิด GPS แล้ว ปล่อยให้สัญญาณตำแหน่งเป็นตัวสั่งแทน จะได้ไม่ตีกัน)
+       */
+      window.MapView.instance.on('moveend', () => {
+        if (window.Store.state.userPosition) return;
+        window.UI.renderList();
+        window.AIUI.updateFor(forecastOrigin());
+      });
     });
 
     // อัปเดตเวลา "กี่นาทีที่แล้ว" และล้างรายงานหมดอายุ
@@ -119,6 +140,10 @@
       window.Store.setRouteFilter(
         route && analysis?.points ? analysis.points.map((p) => p.report.id) : null
       );
+
+      // จุดเสี่ยงจากสถิติก็ต้องกรองด้วยเกณฑ์เดียวกัน ไม่งั้นซ่อนหมุดรายงานไปแล้ว
+      // แต่ยังมีวงจุดสถิติเต็มเมืองค้างอยู่ ซึ่งรกกว่าเดิมอีก
+      window.Hotspots.setRouteFilter(route ? route.coordinates : null);
     };
 
     window.Navigate.onFinish = (dest) => {
@@ -174,6 +199,9 @@
           lastListRender = Date.now();
           window.UI.renderList();
         }
+
+        // โมเดลทำนายระดับจังหวัด เรียกทุกครั้งได้ มันจะข้ามเองถ้ายังอยู่จังหวัดเดิม
+        window.AIUI.updateFor(state.userPosition);
       }
 
       if (reason === 'following' || reason === 'simulating') {
@@ -238,6 +266,61 @@
       window.MapView.resetNorth();
       window.UI.toast('หันกลับไปทางทิศเหนือแล้ว');
     });
+
+  }
+
+  /*
+   * จุดอ้างอิงของโมเดลพยากรณ์ — ตำแหน่งจริงมาก่อนเสมอ
+   * ถ้ายังไม่รู้ ใช้กลางแผนที่ซึ่งคือพื้นที่ที่ผู้ใช้กำลังสนใจอยู่
+   */
+  function forecastOrigin() {
+    const s = window.Store.state;
+    if (s.userPosition) return s.userPosition;
+    const map = window.MapView.instance;
+    if (map) {
+      const c = map.getCenter();
+      return [c.lng, c.lat];
+    }
+    return window.APP_CONFIG.DEFAULT_CENTER;
+  }
+
+  /* ---------- จุดเสี่ยงจากสถิติจริง ---------- */
+
+  /*
+   * เปิดชั้นนี้ให้ตั้งแต่แรก เพราะเป็นข้อมูลจริงที่มีค่าที่สุดในแอป
+   * (อุบัติเหตุจริง 100,056 เหตุการณ์ ปี 2565-2569) ถ้าซ่อนไว้หลังปุ่ม
+   * ผู้ใช้ส่วนใหญ่จะไม่มีวันกดเจอ แล้วเห็นแต่รายงานตัวอย่างไม่กี่จุด
+   *
+   * ล้มเหลวก็แค่ไม่มีชั้นนี้ ปุ่มดับลง แอปอื่น ๆ ทำงานตามปกติ
+   */
+  function initHotspots() {
+    window.Hotspots.onSelect = (h) => window.UI.showHotspot(h);
+
+    /*
+     * ให้ Store คิดคะแนน "ความปลอดภัยรอบตัว" จากจุดเสี่ยงจริงด้วย
+     *
+     * ก่อนหน้านี้คิดจากรายงานของผู้ใช้อย่างเดียว ซึ่งเป็นข้อมูลตัวอย่างในกรุงเทพฯ
+     * ใครอยู่นอกนั้นจะเห็น "ปลอดภัย 100% · 0 จุดใกล้เคียง" ตลอด ทั้งที่ไม่จริง
+     * จุดสถิติมีครบทั้งประเทศ จึงตอบได้ทุกที่ที่ผู้ใช้ยืนอยู่
+     */
+    window.Store.setHotspotProvider((origin, radius) =>
+      window.Hotspots.near(origin, radius, 40),
+    );
+
+    window.Hotspots.enable()
+      .then(() => {
+        const meta = window.Hotspots.meta();
+        window.UI.toast(
+          `จุดเสี่ยงจากสถิติจริง ${meta.count.toLocaleString('th-TH')} จุด ` +
+            `(${meta.range.from.slice(0, 4)}–${meta.range.to.slice(0, 4)})`,
+        );
+        // ข้อมูลเพิ่งมาถึง คะแนนรอบตัวเปลี่ยนแล้ว ต้องวาดใหม่
+        window.UI.renderList();
+      })
+      .catch((err) => {
+        // ไม่มีปุ่มให้ผู้ใช้เปิดเองแล้ว ล้มก็แค่ไม่มีชั้นนี้ ไม่ต้องแจ้งอะไร
+        console.warn('ชั้นจุดเสี่ยงใช้งานไม่ได้:', err.message);
+      });
   }
 
   if (document.readyState === 'loading') {

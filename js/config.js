@@ -92,7 +92,12 @@ window.APP_CONFIG = (function () {
     SATELLITE_TILES:
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
 
-    STORAGE_KEY: 'roadwarn.reports.v1',
+    /*
+     * ขยับเป็น v2 ตอนเปลี่ยนข้อมูลตัวอย่างจากชุดตายตัว 12 จุด มาเป็นชุดสุ่ม
+     * ถ้าไม่ขยับ เครื่องที่เคยเปิดแอปแล้วจะยังเห็นชุดเดิมค้างใน localStorage ตลอดไป
+     * เพราะ seed() ทำงานเฉพาะตอนยังไม่มีข้อมูลเก็บไว้
+     */
+    STORAGE_KEY: 'roadwarn.reports.v2',
     SETTINGS_KEY: 'roadwarn.settings.v1',
 
     // ระยะที่ถือว่า "รายงานหมดอายุ" (ชั่วโมง)

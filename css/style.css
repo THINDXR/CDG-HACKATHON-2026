@@ -2764,3 +2764,519 @@ body.picking .phone > #map::after {
 }
 .row-btn__text { flex: 1; font-size: 14px; }
 .row-btn__go { color: var(--text-dim); font-size: 17px; display: grid; place-items: center; }
+
+/* ---------- การ์ดพยากรณ์จากโมเดล ---------- */
+
+/*
+ * ใช้ฟ้า (--accent-2) เป็นสีประจำการ์ด ตามที่ธีมกำหนดไว้ว่าฟ้าคือ
+ * "ข้อมูลที่ระบบคาดการณ์" — ผู้ใช้จะแยกออกทันทีว่าอันไหนคือสิ่งที่เกิดขึ้นจริง
+ * (รายงานจากคน สีส้ม/แดง) กับอันไหนคือสิ่งที่โมเดลเดา
+ */
+.ai {
+  --ai-color: var(--accent-2);
+  margin: 0 14px 10px;
+  padding: 11px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--ai-color) 32%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--ai-color) 12%, transparent),
+      color-mix(in srgb, var(--ai-color) 5%, transparent));
+}
+
+.ai__loading {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.ai__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ai__title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.ai__title strong {
+  font-size: 13.5px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ป้ายกำกับที่บอกตรง ๆ ว่าตัวเลขนี้มาจากโมเดล ไม่ใช่รายงานของคน */
+.ai__badge {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: var(--accent-2);
+  background: var(--accent-2-soft);
+  border: 1px solid color-mix(in srgb, var(--accent-2) 30%, transparent);
+}
+
+.ai__level {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--ai-color);
+}
+
+.ai__figure {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai__pct {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -1px;
+  color: var(--ai-color);
+  font-variant-numeric: tabular-nums;
+}
+.ai__pct small { font-size: 15px; font-weight: 700; margin-left: 1px; }
+
+.ai__caption {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.ai__caption strong { color: var(--text); }
+
+.ai__reasons {
+  margin: 9px 0 0;
+  padding: 0 0 0 16px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.ai__reasons li { margin-bottom: 2px; }
+
+.ai__subhead {
+  margin: 11px 0 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+}
+
+/* แถบ 7 วัน — สูงตามความเสี่ยง สีตามระดับ อ่านรูปทรงได้ก่อนอ่านตัวเลข */
+.ai__week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.ai-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.ai-day__bar {
+  width: 100%;
+  height: 42px;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+.ai-day__bar i {
+  display: block;
+  width: 100%;
+  background: var(--ai-color);
+  border-radius: 5px 5px 0 0;
+}
+
+.ai-day__label { font-size: 9.5px; color: var(--text-dim); }
+.ai-day__pct {
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* วันนี้ต้องหาเจอได้ในพริบตา ไม่ต้องไล่นับจากซ้าย */
+.ai-day.is-today .ai-day__label {
+  color: var(--text);
+  font-weight: 700;
+}
+.ai-day.is-today .ai-day__bar {
+  outline: 1px solid color-mix(in srgb, var(--ai-color) 55%, transparent);
+  outline-offset: 1px;
+}
+
+.ai__note-toggle {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  color: var(--accent-2);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ai__note {
+  margin: 7px 0 0;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.ai__note strong { color: var(--text); }
+
+/* บรรทัดอธิบายว่าโมเดลไปขยับคะแนนเส้นทางเท่าไร อยู่ในแผ่นสรุปการเดินทาง */
+.trip-ai {
+  --ai-color: var(--accent-2);
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--ai-color) 28%, transparent);
+  background: color-mix(in srgb, var(--ai-color) 8%, transparent);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.trip-ai strong { color: var(--ai-color); }
+.trip-ai small { color: var(--text-dim); }
+
+/* ---------- ชั้นจุดเสี่ยงจากสถิติจริง ---------- */
+
+/* ปุ่มเปิด/ปิดชั้นข้อมูล — ติดสว่างเมื่อเปิดอยู่ เหมือนปุ่ม toggle ทั่วไป */
+.map-btn--hotspots.is-active {
+  color: var(--danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
+/*
+ * การ์ดรายละเอียดจุดเสี่ยง ใช้แผ่นเดียวกับการ์ดรายงาน แต่ต้องอ่านออกทันที
+ * ว่าเป็นคนละชนิดข้อมูล จึงมีป้าย "สถิติจริง" กำกับไว้ตลอด
+ */
+.hotspot-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.hotspot-card__badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--card-color);
+  background: color-mix(in srgb, var(--card-color) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--card-color) 35%, transparent);
+}
+
+.hotspot-card__level { font-size: 12.5px; font-weight: 800; }
+
+.hotspot-card__road {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.2px;
+}
+
+.hotspot-card__where {
+  margin: 3px 0 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ตัวเลขสี่ช่องเรียงกัน อ่านเทียบกันได้ในแวบเดียว */
+.hotspot-card__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.hotspot-card__stats > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.hotspot-card__stats strong {
+  font-size: 17px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.hotspot-card__stats span { font-size: 9.5px; color: var(--text-dim); }
+
+.hotspot-card__line {
+  margin: 0 0 5px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.hotspot-card__line strong { color: var(--text); }
+
+.hotspot-card__note {
+  margin: 10px 0 0;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+/* ---------- หมุดจุดเสี่ยงจากสถิติ ---------- */
+
+/*
+ * ใช้ทรงเดียวกับหมุดรายงานเป๊ะ ๆ เพื่อให้อ่านแผนที่ได้ด้วยภาษาเดียว
+ * แต่ต้องแยกออกได้ทันทีว่านี่ไม่ใช่เหตุที่คนเพิ่งแจ้ง:
+ *   - ขอบประ (แบบเดียวกับจุดที่ระบบคาดการณ์)
+ *   - ไม่เด้ง แม้ระดับจะรุนแรง เพราะเป็นสถิติย้อนหลัง ไม่ใช่เรื่องด่วน
+ *   - ป้ายมุมเป็นตัวเลขจำนวนครั้ง ไม่ใช่ไอคอนคน
+ */
+.hazard-marker[data-source='stat'] .hazard-marker__pin {
+  border-style: dashed;
+  border-width: 2px;
+  border-color: rgba(255, 255, 255, 0.8);
+  opacity: 0.94;
+  animation: none;
+}
+
+.hazard-marker__badge--count {
+  top: auto;
+  bottom: -4px;
+  right: -6px;
+  min-width: 20px;
+  width: auto;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: #10151c;
+  color: var(--pin-color);
+  border-color: #10151c;
+}
+
+/*
+ * ป้ายที่มาบนหมุดสถิติ ใช้ฟ้าชุดเดียวกับจุดที่ระบบคาดการณ์
+ * ต้องกันป้ายตัวเลขออก ไม่งั้นกฎนี้ชนะด้วย specificity แล้วทับสีป้ายนับด้วย
+ */
+.hazard-marker[data-source='stat'] .hazard-marker__badge:not(.hazard-marker__badge--count) {
+  background: var(--accent-2);
+  color: #08131b;
+  border-color: #10151c;
+}
+
+/* ---------- คำอธิบายประเภทจุดเสี่ยง ---------- */
+
+.legend {
+  margin: 0 14px 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.legend__head {
+  margin: 0 0 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--text-dim);
+}
+
+.legend__list { margin: 0; padding: 0; list-style: none; }
+
+.legend__row {
+  --legend-color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+/* จุดสีต้องเป็นตัวเดียวกับที่เห็นบนแผนที่ ไม่งั้น legend ก็ไม่ช่วยอะไร */
+.legend__icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--legend-color);
+  background: color-mix(in srgb, var(--legend-color) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--legend-color) 45%, transparent);
+}
+.legend__icon svg { width: 13px; height: 13px; }
+
+.legend__label {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legend__count {
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--legend-color);
+}
+
+.legend__note {
+  margin: 8px 0 0;
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+.legend__note strong { color: var(--text); font-weight: 600; }
+
+/* ป้ายประเภทในการ์ดรายละเอียดจุดเสี่ยง */
+.hotspot-card__cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 8px;
+  padding: 3px 9px 3px 5px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--cat-color);
+  background: color-mix(in srgb, var(--cat-color) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cat-color) 40%, transparent);
+}
+.hotspot-card__cat svg { width: 13px; height: 13px; }
+
+.hotspot-card__hint {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+/* บรรทัดที่สองของการ์ดความเสี่ยง — ที่มาจากสถิติ ไม่ใช่รายงานสด */
+.risk__summary--stat {
+  margin-top: 2px;
+  opacity: 0.85;
+}
+
+/* บรรทัดที่บอกว่าโมเดลพยากรณ์ไปขยับคะแนนเท่าไร */
+.risk__summary--ai {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  color: var(--text-dim);
+}
+
+.risk__ai-badge {
+  flex: none;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  color: var(--accent-2);
+  background: var(--accent-2-soft);
+  border: 1px solid color-mix(in srgb, var(--accent-2) 35%, transparent);
+}
+
+/* ---------- สาเหตุและความรุนแรง (การ์ดจุดเสี่ยง) ---------- */
+
+/*
+ * สาเหตุคือคำตอบของ "ตรงนี้ชนกันเพราะอะไร" ซึ่งเป็นสิ่งเดียวในการ์ด
+ * ที่บอกว่าจะระวังอะไร จึงให้พื้นที่และน้ำหนักมากกว่าตัวเลขอื่น
+ */
+.hotspot-cause {
+  --cat-color: var(--accent);
+  margin: 0 0 8px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--cat-color);
+  background: color-mix(in srgb, var(--cat-color) 12%, transparent);
+}
+
+.hotspot-cause__label {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+
+.hotspot-cause__text {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+/* ความรุนแรงของการชน — แดงเฉพาะจุดที่ชนแล้วถึงตายเกินครึ่ง */
+.hotspot-outcome {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 10px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.hotspot-outcome strong { color: var(--text); }
+
+.hotspot-outcome__icon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.06);
+}
+.hotspot-outcome__icon svg { width: 15px; height: 15px; }
+
+.hotspot-outcome.is-deadly {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent);
+}
+.hotspot-outcome.is-deadly .hotspot-outcome__icon {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
+}
+.hotspot-outcome.is-deadly strong { color: var(--danger); }
+.hotspot-outcome.is-deadly small {
+  font-size: 10.5px;
+  color: color-mix(in srgb, var(--danger) 75%, var(--text));
+}
+
+/* ตัวเลขผู้เสียชีวิตต้องเด่นกว่าช่องอื่นเมื่อมีคนตายจริง */
+.hotspot-card__stats > div.is-fatal {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+}
+.hotspot-card__stats > div.is-fatal strong { color: var(--danger); }

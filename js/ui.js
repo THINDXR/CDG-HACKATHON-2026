@@ -209,20 +209,33 @@ window.UI = (function () {
     const risk = window.Store.riskAssessment(origin());
     const known = window.Store.state.userPosition != null;
 
-    box.style.setProperty('--risk-color', risk.level.color);
-    box.dataset.level = risk.level.key;
+    /*
+     * เอาผลโมเดลพยากรณ์มาปรับคะแนนด้วย — สามแหล่งรวมเป็นตัวเลขเดียว
+     *
+     *   รายงานผู้ใช้     สิ่งที่กำลังเกิดรอบตัวตอนนี้
+     *   จุดเสี่ยงสถิติ    ที่ที่เคยเกิดซ้ำ ๆ มา 4 ปี
+     *   โมเดลพยากรณ์    วันนี้เป็นวันแบบไหนสำหรับจังหวัดนี้
+     *
+     * ใช้ blendRouteScore ตัวเดียวกับที่ใช้กับคะแนนเส้นทาง เกณฑ์จึงตรงกัน
+     * ทั้งแอป — ถ่วงน้ำหนักโมเดล 30% และวันที่ปกติจะไม่ขยับคะแนนเลย
+     */
+    const forecast = window.AIUI?.currentForecast?.() || null;
+    const blended = window.AIForecast.blendRouteScore(risk.score, forecast);
+    const level = blended.adjusted ? window.Store.riskLevelFor(blended.score) : risk.level;
 
+    box.style.setProperty('--risk-color', level.color);
+    box.dataset.level = level.key;
 
     const nearestText = risk.nearest && risk.nearest.distance != null
       ? U.formatDistance(risk.nearest.distance)
       : '—';
 
     // พาดหัวเป็น "ปลอดภัยกี่ %" ซึ่งอ่านง่ายกว่าคะแนนเสี่ยง 0-100 ที่ยิ่งมากยิ่งแย่
-    const safety = 100 - risk.score;
+    const safety = 100 - blended.score;
 
     box.innerHTML = `
       <div class="risk__head">
-        <span class="risk__level">${escapeHtml(risk.level.label)}</span>
+        <span class="risk__level">${escapeHtml(level.label)}</span>
         <span class="risk__score">${safety}<small>%</small></span>
       </div>
       <div class="risk__meter" role="meter" aria-valuenow="${safety}"
@@ -231,11 +244,26 @@ window.UI = (function () {
         <div class="risk__bar" style="width:${Math.max(safety, 2)}%"></div>
       </div>
       <p class="risk__summary">
-        <strong>${risk.count}</strong> จุดใกล้เคียง
+        <strong>${risk.count}</strong> รายงานในรัศมี ${Math.round(risk.radius / 1000)} กม.
         ${risk.high ? ` · <strong>${risk.high}</strong> อันตราย` : ''}
         ${risk.nearest ? ` · ใกล้สุด <strong>${escapeHtml(nearestText)}</strong>` : ''}
         ${known ? '' : ' · คิดจากกลางจอ'}
-      </p>`;
+      </p>
+      ${risk.hotspotCount ? `
+        <p class="risk__summary risk__summary--stat">
+          <strong>${risk.hotspotCount}</strong> จุดเสี่ยงจากสถิติในรัศมี
+          ${Math.round(risk.hotspotRadius / 1000)} กม.
+          ${risk.nearestHotspot
+            ? ` · ใกล้สุด <strong>${escapeHtml(U.formatDistance(risk.nearestHotspot.distance))}</strong>`
+            : ''}
+        </p>` : ''}
+      ${blended.adjusted ? `
+        <p class="risk__summary risk__summary--ai">
+          <span class="risk__ai-badge">AI</span>
+          ${escapeHtml(forecast.province)}วันนี้${escapeHtml(forecast.level.label)}
+          ${blended.delta > 0 ? 'จึงหัก' : 'จึงเพิ่ม'}คะแนนปลอดภัย
+          ${Math.abs(blended.delta)} จุด (จาก ${100 - blended.original}%)
+        </p>` : ''}`;
   }
 
   /* ---------- การ์ดรายละเอียด ---------- */
@@ -369,9 +397,135 @@ window.UI = (function () {
       if (!window.Store.state.userPosition) {
         toast('เปิดติดตามตำแหน่งหรือโหมดจำลองการขับ เพื่อให้นำทางเดินหน้าได้', 'warn');
       }
+
+      announceForecast();
     } catch (err) {
       toast(err.message || 'หาเส้นทางไม่สำเร็จ', 'warn');
     }
+  }
+
+  /*
+   * การ์ดรายละเอียดจุดเสี่ยงจากสถิติจริง (แตะวงกลมบนแผนที่)
+   *
+   * ใช้แผ่นรายละเอียดตัวเดียวกับหมุดรายงาน แต่เนื้อหาคนละแบบสิ้นเชิง —
+   * ตรงนี้ไม่มี "เมื่อกี้มีคนแจ้ง" มีแต่ "ที่นี่เกิดมาแล้วกี่ครั้งใน 4 ปี"
+   * จึงต้องบอกให้ชัดว่าเป็นสถิติย้อนหลัง ไม่ใช่เหตุที่กำลังเกิดอยู่
+   */
+  /*
+   * สาเหตุที่พบบ่อยที่สุด — ยกขึ้นมาเป็นบล็อกเด่น
+   *
+   * เดิมเป็นบรรทัดสีเทาเล็ก ๆ ท้ายการ์ด ทั้งที่มันคือคำตอบของคำถามที่คนขับ
+   * อยากรู้ที่สุด: "แล้วตรงนี้มันชนกันเพราะอะไร" ตัวเลขบอกว่าอันตรายแค่ไหน
+   * แต่สาเหตุคือสิ่งเดียวที่บอกว่าจะระวังอะไร
+   */
+  function causeBlock(h, cat) {
+    if (!h.cause) return '';
+    return `
+      <div class="hotspot-cause" style="--cat-color:${cat.color}">
+        <span class="hotspot-cause__label">สาเหตุที่พบบ่อยที่สุด</span>
+        <strong class="hotspot-cause__text">${escapeHtml(h.cause)}</strong>
+      </div>`;
+  }
+
+  /*
+   * ความรุนแรงของการชน — บอกเป็นประโยคที่เห็นภาพ ไม่ใช่แค่ตัวเลขลอย ๆ
+   *
+   * "5 ครั้ง 3 เสียชีวิต" อ่านแล้วยังต้องคิดต่อเอง แต่ "เกิด 5 ครั้ง มีคนตาย 3 คน"
+   * เข้าใจทันที และการเทียบสัดส่วนตาย/ครั้ง ทำให้แยกออกว่าจุดไหน "ชนแล้วตาย"
+   * กับจุดไหน "ชนบ่อยแต่เจ็บเล็กน้อย" ซึ่งเป็นคนละปัญหาและแก้คนละแบบ
+   */
+  function outcomeBlock(h) {
+    if (!h.dead && !h.injured) return '';
+
+    const parts = [];
+    if (h.dead) parts.push(`<strong>เสียชีวิต ${h.dead} คน</strong>`);
+    if (h.injured) parts.push(`บาดเจ็บ ${h.injured} คน`);
+
+    // ตายมากกว่าครึ่งของจำนวนครั้ง = ชนทีไรถึงตายแทบทุกที ไม่ใช่จุดที่ชนเบา ๆ บ่อย
+    const deadly = h.dead > 0 && h.dead / h.accidents >= 0.5;
+
+    return `
+      <div class="hotspot-outcome${deadly ? ' is-deadly' : ''}">
+        <span class="hotspot-outcome__icon">${window.Icons.get(deadly ? 'accident' : 'shield')}</span>
+        <span class="hotspot-outcome__text">
+          เกิด ${h.accidents} ครั้ง · ${parts.join(' · ')}
+          ${deadly ? '<br><small>ชนแล้วถึงตายเกินครึ่งของครั้งที่เกิด</small>' : ''}
+        </span>
+      </div>`;
+  }
+
+  function showHotspot(h) {
+    const level = window.Hotspots.levelOf(h.severity);
+    const cat = window.Hotspots.classify(h);
+    const card = $('#sheetDetail');
+    const sheet = $('#sidebar');
+
+    // ยกเลิกการเลือกหมุดรายงาน ไม่งั้น renderDetail() จะมาวาดทับการ์ดนี้
+    window.Store.select(null);
+
+    sheet.classList.add('is-detail');
+    card.style.setProperty('--card-color', level.color);
+    card.innerHTML = `
+      <div class="hotspot-card">
+        <div class="hotspot-card__head">
+          <span class="hotspot-card__badge">สถิติจริง</span>
+          <span class="hotspot-card__level" style="color:${level.color}">
+            ${escapeHtml(level.label)}
+          </span>
+        </div>
+
+        <span class="hotspot-card__cat" style="--cat-color:${cat.color}">
+          ${window.Icons.get(cat.icon)}${escapeHtml(cat.label)}
+        </span>
+
+        <h3 class="hotspot-card__road">${escapeHtml(h.road || 'ไม่ระบุสายทาง')}</h3>
+        <p class="hotspot-card__where">
+          ${escapeHtml(h.province)}${h.geometry ? ` · ${escapeHtml(h.geometry)}` : ''}
+        </p>
+
+        ${causeBlock(h, cat)}
+
+        ${outcomeBlock(h)}
+
+        <div class="hotspot-card__stats">
+          <div><strong>${h.accidents}</strong><span>ครั้ง</span></div>
+          <div class="${h.dead ? 'is-fatal' : ''}"><strong>${h.dead}</strong><span>เสียชีวิต</span></div>
+          <div><strong>${h.injured}</strong><span>บาดเจ็บ</span></div>
+          <div><strong>${h.perYear}</strong><span>ครั้ง/ปี</span></div>
+        </div>
+
+        <p class="hotspot-card__hint">${escapeHtml(cat.hint)}</p>
+
+        ${h.nightShare >= 0.4 ? `<p class="hotspot-card__line">เกิดตอนกลางคืน <strong>${Math.round(h.nightShare * 100)}%</strong> ของครั้งทั้งหมด</p>` : ''}
+        ${h.rainShare >= 0.2 ? `<p class="hotspot-card__line">มีฝนตอนเกิดเหตุ <strong>${Math.round(h.rainShare * 100)}%</strong> ของครั้งทั้งหมด</p>` : ''}
+
+        <p class="hotspot-card__note">
+          สถิติสะสมปี 2565–2569 จากข้อมูลอุบัติเหตุบนโครงข่ายถนนของกระทรวงคมนาคม
+          ไม่ใช่เหตุที่กำลังเกิดอยู่ตอนนี้ · เกิดล่าสุด ${escapeHtml(h.latest)}
+        </p>
+      </div>`;
+
+    collapseToMap();
+    window.MapView.instance.flyTo({ center: [h.lon, h.lat], zoom: 15.5, duration: 900 });
+  }
+
+  /*
+   * แจ้งผลพยากรณ์ของวันนี้ตอนเริ่มนำทาง
+   *
+   * ตั้งใจแจ้งเฉพาะวันที่โมเดลบอกว่าเกินเกณฑ์จริง (ระดับ "ควรระวัง" ขึ้นไป)
+   * ถ้าเด้งทุกครั้งที่กดนำทาง ผู้ใช้จะเลิกอ่านภายในไม่กี่วัน แล้วคำเตือนก็ไร้ค่า
+   *
+   * หน่วงไว้ให้ toast "กำลังคำนวณเส้นทาง" ผ่านไปก่อน จะได้ไม่ทับกัน
+   */
+  function announceForecast() {
+    const notice = window.AIUI?.navigationNotice?.();
+    if (!notice) return;
+
+    setTimeout(() => {
+      if (!window.Navigate.isActive) return;
+      toast(notice.text, 'warn');
+      if (window.Alerts.settings.voice) window.Alerts.speak(notice.speech);
+    }, 2200);
   }
 
   /**
@@ -591,14 +745,27 @@ window.UI = (function () {
       return;
     }
 
-    safety.style.setProperty('--safety-color', a.level.color);
-    safety.dataset.level = a.level.key;
-    $('#navSafetyLabel').textContent = a.level.label;
-    $('#navSafetyDetail').textContent = a.points.length
-      ? `${a.points.length} จุดเสี่ยงบนเส้นทาง`
+    /*
+     * ตัวเลขระหว่างขับต้องเป็นชุดเดียวกับที่แผ่นสรุปแสดงก่อนออกรถ
+     * จึงผ่าน tripBlend() ตัวเดียวกัน — รวมผลโมเดลพยากรณ์เข้าไปด้วย
+     * ถ้าคิดคนละสูตร ผู้ใช้จะเห็นเลขกระโดดตอนกดเริ่มนำทางโดยไม่มีเหตุผล
+     */
+    const blend = tripBlend(a);
+
+    safety.style.setProperty('--safety-color', blend.color);
+    safety.dataset.level = blend.levelKey;
+    $('#navSafetyLabel').textContent = blend.levelLabel;
+
+    // นับทั้งจุดที่คนแจ้ง และจุดเสี่ยงจากสถิติที่อยู่บนเส้นทางเดียวกัน
+    const stats = window.Hotspots.routeCount();
+    const parts = [];
+    if (a.points.length) parts.push(`${a.points.length} รายงาน`);
+    if (stats) parts.push(`${stats} จุดสถิติ`);
+    $('#navSafetyDetail').textContent = parts.length
+      ? `${parts.join(' · ')} บนเส้นทาง`
       : 'ไม่พบจุดเสี่ยงบนเส้นทาง';
-    // ตัวเลขชุดเดียวกับที่แผ่นสรุปการเดินทางแสดงก่อนออกรถ จะได้เทียบกันได้
-    $('#navSafetyScore').innerHTML = `${a.score}<small>%</small>`;
+
+    $('#navSafetyScore').innerHTML = `${blend.score}<small>%</small>`;
   }
 
   // โทนสีการ์ดเตือนตามระดับความรุนแรง — อุ่นทุกระดับ เพราะทุกอันคือ "สิ่งที่ต้องระวัง"
@@ -846,6 +1013,8 @@ window.UI = (function () {
     renderDashNow(risk);
     renderFactors(risk);
     renderEvents();
+    // คำอธิบายสัญลักษณ์ของจุดเสี่ยงจากสถิติ อยู่ที่หน้านี้แล้ว ไม่ใช่แผ่นรายการ
+    window.Hotspots.renderLegend();
   }
 
   /* ---------- ผลลัพธ์ที่แอปสร้าง: อุบัติเหตุลดลงกี่ % ---------- */
@@ -1351,6 +1520,49 @@ window.UI = (function () {
     }
   }
 
+  /*
+   * รวมคะแนนของโมเดลพยากรณ์เข้ากับคะแนนเส้นทาง
+   *
+   * คะแนนของ RouteRisk มาจากรายงานผู้ใช้บนถนนเส้นนั้น ส่วนโมเดลบอกว่า "วันนี้"
+   * เป็นวันแบบไหนสำหรับจังหวัดนี้ (ฝน วันหยุดยาว สงกรานต์) สองอย่างนี้คนละแกนกัน
+   * จึงเอามารวมได้ โดยให้โมเดลถ่วงน้ำหนักแค่ 30% — ดู AIForecast.blendRouteScore()
+   *
+   * ถ้าโมเดลยังโหลดไม่เสร็จหรือใช้ไม่ได้ ทุกอย่างกลับไปเป็นคะแนนเดิมเป๊ะ ๆ
+   */
+  function tripBlend(analysis) {
+    const forecast = window.AIUI?.currentForecast?.() || null;
+    const blended = window.AIForecast.blendRouteScore(analysis.score, forecast);
+
+    if (!blended.adjusted) {
+      return {
+        score: analysis.score,
+        levelKey: analysis.level.key,
+        levelLabel: analysis.level.label,
+        color: analysis.level.color,
+        note: '',
+      };
+    }
+
+    const level = window.RouteRisk.levelFor(blended.score);
+    const reason = forecast.reasons[0];
+    const direction = blended.delta > 0 ? 'เพิ่ม' : 'ลด';
+
+    return {
+      score: blended.score,
+      levelKey: level.key,
+      levelLabel: level.label,
+      color: level.color,
+      note: `
+        <p class="trip-ai" style="--ai-color:${forecast.level.color}">
+          <strong>${escapeHtml(forecast.province)}วันนี้${escapeHtml(forecast.level.label)}</strong>
+          คาดว่าทั้งจังหวัดจะเกิด ${forecast.expectedCount.toFixed(1)} ครั้ง
+          จึง${direction}คะแนนเสี่ยงของเส้นทางไป ${Math.abs(blended.delta)} จุด
+          (จาก ${blended.original}%)
+          ${reason ? `<br><small>${escapeHtml(reason.text)}</small>` : ''}
+        </p>`,
+    };
+  }
+
   /** เวลา ระยะทาง ความเสี่ยงรวม และรายชื่อถนนเสี่ยงบนเส้นทางที่เลือก */
   function renderTripBody() {
     const all = tripRoutes.map((r) => window.RouteRisk.analyze(r, tripVehicle));
@@ -1359,6 +1571,8 @@ window.UI = (function () {
 
     const eta = new Date(Date.now() + a.duration * 1000)
       .toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+
+    const blend = tripBlend(a);
 
     const roads = a.roads.slice(0, 5).map((r) => `
       <li class="trip-road" style="--road-color:${r.level.color}">
@@ -1379,18 +1593,20 @@ window.UI = (function () {
         <div><span>ถึงเวลา</span><strong>${eta}</strong></div>
       </div>
 
-      <div class="trip-risk" data-level="${a.level.key}" style="--risk-color:${a.level.color}">
+      <div class="trip-risk" data-level="${blend.levelKey}" style="--risk-color:${blend.color}">
         <span class="trip-risk__icon">${window.Icons.get('shield')}</span>
         <span class="trip-risk__text">
-          <strong>เส้นทางนี้ ${escapeHtml(a.level.label)}</strong>
+          <strong>เส้นทางนี้ ${escapeHtml(blend.levelLabel)}</strong>
           <small>${
             a.points.length
               ? `พบ ${a.points.length} จุดเสี่ยงบนถนนที่จะวิ่งผ่าน${a.accidents ? ` (อุบัติเหตุ ${a.accidents})` : ''}`
               : 'ยังไม่มีรายงานจุดเสี่ยงบนถนนที่จะวิ่งผ่าน'
           }</small>
         </span>
-        <span class="trip-risk__score">${a.score}<small>%</small></span>
+        <span class="trip-risk__score">${blend.score}<small>%</small></span>
       </div>
+
+      ${blend.note}
 
       ${roads ? `
         <h4 class="trip-subhead">ความเสี่ยงรายถนนบนเส้นทาง</h4>
@@ -1770,6 +1986,7 @@ window.UI = (function () {
     showAlert,
     hideAlert,
     showNavHazard,
+    showHotspot,
     openTripSheet,
     toast,
     setNearby,

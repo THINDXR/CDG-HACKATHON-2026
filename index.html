@@ -126,6 +126,9 @@
     <div class="sidebar__body">
       <section id="riskPanel" class="risk" aria-live="polite" aria-label="ระดับความเสี่ยงรอบตัว"></section>
 
+      <!-- การ์ดพยากรณ์จากโมเดล — ซ่อนไว้จนกว่าจะประเมินสำเร็จ -->
+      <section id="aiPanel" class="ai" aria-live="polite" aria-label="พยากรณ์ความเสี่ยงรายวัน" hidden></section>
+
       <ul id="hazardList" class="hazard-list"></ul>
 
       <section id="sheetDetail" class="sheet-detail" aria-live="polite"></section>
@@ -203,6 +206,11 @@
       <div class="panel">
         <h3 class="panel__head">วิเคราะห์ปัจจัยเสี่ยง</h3>
         <div id="riskFactors" class="factors"></div>
+      </div>
+
+      <!-- คำอธิบายสีของจุดเสี่ยงจากสถิติ (อยู่ที่แดชบอร์ด ไม่ใช่แผ่นรายการ) -->
+      <div class="panel" id="hotspotLegendPanel" hidden>
+        <section id="hotspotLegend" class="legend" aria-label="คำอธิบายประเภทจุดเสี่ยง"></section>
       </div>
 
       <div class="panel">
@@ -378,6 +386,11 @@
   <script src="js/route.js"></script>
   <script src="js/store.js"></script>
   <script src="js/risk.js"></script>
+  <script src="js/hotspots.js"></script>
+  <script src="js/ai-model.js"></script>
+  <script src="js/ai-holidays.js"></script>
+  <script src="js/ai-forecast.js"></script>
+  <script src="js/ai-ui.js"></script>
   <script src="js/impact.js"></script>
   <script src="js/map.js"></script>
   <script src="js/alerts.js"></script>
