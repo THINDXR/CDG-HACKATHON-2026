@@ -96,9 +96,27 @@ window.Navigate = (function () {
    * บนถนนคู่ขนานได้ ส่วนอันนี้เอาเฉพาะจุดที่ RouteRisk จับคู่เข้ากับเส้นทางแล้ว
    * จึงมั่นใจได้ว่าเป็นจุดที่เราจะวิ่งผ่านจริง ๆ
    */
+  /*
+   * เตือนสองชนิดด้วยตรรกะเดียวกัน
+   *
+   *   รายงานผู้ใช้  สิ่งที่มีคนแจ้งว่าเกิดอยู่ตอนนี้
+   *   จุดสถิติ      ที่ที่เคยเกิดอุบัติเหตุซ้ำ ๆ มา 4 ปี (จากโมเดลของเรา)
+   *
+   * อันไหนอยู่ใกล้กว่าได้ขึ้นก่อน เพราะการ์ดเตือนมีที่เดียวและคนขับอ่านได้ทีละอัน
+   * ถ้าโชว์พร้อมกันสองใบจะแย่งความสนใจกันเองในจังหวะที่ต้องมองถนน
+   */
   function warnHazardAhead() {
     if (!analysis) return;
-    const next = window.RouteRisk.upcoming(analysis, progress.travelled);
+
+    const report = window.RouteRisk.upcoming(analysis, progress.travelled);
+    const stat = window.Hotspots?.upcomingOnRoute(
+      progress.travelled,
+      window.RouteRisk.WARN_AHEAD_M,
+    );
+
+    // เลือกอันที่ถึงก่อน
+    const useStat = stat && (!report || stat.ahead < report.ahead);
+    const next = useStat ? statAsHazard(stat) : report;
 
     if (!next) {
       onHazard(null);
@@ -109,9 +127,47 @@ window.Navigate = (function () {
     if (warnedHazards.has(next.report.id)) return;
     warnedHazards.add(next.report.id);
 
-    const def = window.APP_CONFIG.HAZARD_TYPES[next.report.type];
     window.Alerts?.notify(next.report.severity);
-    speak(`ระวัง ${def.label} ข้างหน้า ${U.formatDistance(next.ahead)} บน${next.road}`);
+
+    if (useStat) {
+      speak(next.speech);
+    } else {
+      const def = window.APP_CONFIG.HAZARD_TYPES[next.report.type];
+      speak(`ระวัง ${def.label} ข้างหน้า ${U.formatDistance(next.ahead)} บน${next.road}`);
+    }
+  }
+
+  /*
+   * แปลงจุดสถิติให้อยู่ในรูปเดียวกับรายงาน เพื่อให้การ์ดเตือนวาดได้โดยไม่ต้องแก้
+   *
+   * ความรุนแรงอิงจำนวนผู้เสียชีวิต ไม่ใช่จำนวนครั้ง — จุดที่เกิดบ่อยแต่เจ็บเล็กน้อย
+   * ไม่ควรเตือนแรงเท่าจุดที่ชนทีไรถึงตาย
+   */
+  function statAsHazard(hit) {
+    const h = hit.spot;
+    const cat = window.Hotspots.classify(h);
+    const severity = h.dead >= 3 ? 'high' : h.dead > 0 ? 'medium' : 'low';
+
+    return {
+      ahead: hit.ahead,
+      road: h.road || h.province,
+      isStat: true,
+      category: cat,
+      spot: h,
+      report: {
+        id: `stat:${hit.idx}`,
+        type: 'accident',
+        severity,
+        road: h.road || h.province,
+      },
+      /*
+       * พูดสิ่งที่ต้องทำก่อน แล้วค่อยบอกเหตุผล — คนขับได้ยินคำสั่งตั้งแต่คำแรก
+       * ไม่ต้องรอฟังจนจบประโยคถึงจะรู้ว่าควรทำอะไร
+       */
+      speech:
+        `${cat.action || 'ระวัง'} ข้างหน้า ${U.formatDistance(hit.ahead)} ` +
+        `จุดนี้เคยเกิดอุบัติเหตุ ${h.accidents} ครั้ง`,
+    };
   }
 
   /** พูดเตือนล่วงหน้าก่อนถึงทางเลี้ยว — พูดครั้งเดียวต่อหนึ่งทางเลี้ยว */

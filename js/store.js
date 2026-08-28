@@ -145,19 +145,6 @@ window.Store = (function () {
     emit('filter');
   }
 
-  /** แสดงเฉพาะประเภทเดียว — ใช้กับแถบชิปที่กดเลือกทีละอัน */
-  function setOnlyType(type) {
-    state.activeTypes = new Set([type]);
-    emit('filter');
-  }
-
-  /** จำนวนรายงานของแต่ละประเภท (ไม่สนตัวกรอง) ใช้ติดตัวเลขบนชิป */
-  function countsByType() {
-    const out = {};
-    for (const r of state.reports) out[r.type] = (out[r.type] || 0) + 1;
-    return out;
-  }
-
   function select(id) {
     state.selectedId = id;
     emit('select');
@@ -240,6 +227,19 @@ window.Store = (function () {
   /** รายงานที่มองเห็น เรียงตามระยะห่างจากจุดอ้างอิง */
   function sortedByDistance(origin) {
     return withDistance(visibleReports(), origin);
+  }
+
+  /*
+   * รายงานที่อยู่ "รอบตัว" จริง ๆ — ใช้รัศมีเดียวกับที่คิดคะแนนความปลอดภัย
+   *
+   * ต่างจาก visibleReports() ที่คืนทุกอันที่ผ่านตัวกรอง ไม่สนระยะ
+   * (แผนที่ยังใช้ตัวนั้นอยู่ เพราะหมุดควรโผล่ตามที่เลื่อนแผนที่ไปดู
+   * ส่วนแผ่นรายการต้องตอบเฉพาะ "รอบตัวตอนนี้")
+   */
+  function nearbyReports(origin) {
+    return withDistance(visibleReports(), origin).filter(
+      (r) => r.distance == null || r.distance <= RISK_RADIUS,
+    );
   }
 
   /* ---------- ประเมินความเสี่ยงของพื้นที่รอบตัว ---------- */
@@ -533,9 +533,7 @@ window.Store = (function () {
     vote,
     toggleType,
     setAllTypes,
-    setOnlyType,
     setRouteFilter,
-    countsByType,
     setSearch,
     select,
     setUserPosition,
@@ -543,6 +541,7 @@ window.Store = (function () {
     setSimulating,
     visibleReports,
     sortedByDistance,
+    nearbyReports,
     riskAssessment,
     riskLevelFor,
     setHotspotProvider,

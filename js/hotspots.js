@@ -58,17 +58,17 @@ window.Hotspots = (function () {
    * (ต่างจาก HAZARD_TYPES ใน config.js ที่เก็บมาร์กอัป SVG ไว้เลย)
    */
   const CATEGORIES = {
-    curve: { key: 'curve', label: 'ทางโค้ง', color: '#bf5af2', icon: 'turnRight',
+    curve: { key: 'curve', label: 'ทางโค้ง', action: 'ลดความเร็วก่อนเข้าโค้ง', color: '#bf5af2', icon: 'turnRight',
       hint: 'เสียการควบคุมขณะเข้าโค้ง — ลดความเร็วก่อนถึงโค้ง' },
-    junction: { key: 'junction', label: 'ทางแยก', color: '#0a84ff', icon: 'roundabout',
+    junction: { key: 'junction', label: 'ทางแยก', action: 'ระวังรถตัดหน้า', color: '#0a84ff', icon: 'roundabout',
       hint: 'ชนกันตรงจุดตัด — ระวังรถตัดหน้าและสัญญาณไฟ' },
-    slope: { key: 'slope', label: 'ทางลาดชัน', color: '#ff9f0a', icon: 'trendDown',
+    slope: { key: 'slope', label: 'ทางลาดชัน', action: 'ลงเนิน ใช้เกียร์ต่ำช่วยเบรก', color: '#ff9f0a', icon: 'trendDown',
       hint: 'ลงเนินแล้วเบรกไม่อยู่ — ใช้เกียร์ต่ำช่วยเบรก' },
-    drowsy: { key: 'drowsy', label: 'หลับใน / ล้า', color: '#5e5ce6', icon: 'clock',
+    drowsy: { key: 'drowsy', label: 'หลับใน / ล้า', action: 'ช่วงคนขับล้า เพิ่มความระวัง', color: '#5e5ce6', icon: 'clock',
       hint: 'ช่วงที่คนขับหมดสมาธิ — แวะพักถ้าขับมานาน' },
-    night: { key: 'night', label: 'กลางคืน / ทัศนวิสัย', color: '#64d2ff', icon: 'fog',
+    night: { key: 'night', label: 'กลางคืน / ทัศนวิสัย', action: 'ทัศนวิสัยต่ำ ชะลอความเร็ว', color: '#64d2ff', icon: 'fog',
       hint: 'เกิดตอนมืดเป็นส่วนใหญ่ — ชะลอความเร็วและระวังคนข้าม' },
-    speed: { key: 'speed', label: 'ทางตรง ใช้ความเร็ว', color: '#ff453a', icon: 'speed',
+    speed: { key: 'speed', label: 'ทางตรง ใช้ความเร็ว', action: 'ลดความเร็ว', color: '#ff453a', icon: 'speed',
       hint: 'ทางโล่งทำให้เร่งเกินตัว — ชนแรงและถึงตายบ่อย' },
   };
 
@@ -395,38 +395,103 @@ window.Hotspots = (function () {
   let routeIndexes = null; // null = ไม่ได้กรอง (โหมดปกติ)
 
   /*
+   * จุดสถิติบนเส้นทาง พร้อมระยะ "along" = วิ่งมากี่เมตรถึงจะถึงจุดนั้น
+   *
+   * ต้องมีค่านี้ถึงจะเตือนล่วงหน้าได้ เพราะการเทียบระยะตรงจากตัวผู้ใช้อย่างเดียว
+   * แยกไม่ออกว่าจุดนั้นอยู่ "ข้างหน้า" หรือ "ผ่านไปแล้ว" — ถ้าเตือนจุดที่ผ่านไปแล้ว
+   * ผู้ใช้จะเลิกเชื่อคำเตือนทั้งหมดอย่างรวดเร็ว
+   */
+  let routeSpots = [];
+
+  /*
    * เส้นทางมีพิกัดเป็นพันจุด ถ้าเทียบทุกจุดกับ hotspot ทั้ง 3,000 จุดตรง ๆ
    * จะเป็นการคำนวณหลักล้านครั้งทุกครั้งที่คำนวณเส้นทางใหม่
    * จึงคัดหยาบด้วยกรอบสี่เหลี่ยมของเส้นทางก่อน แล้วค่อยวัดระยะจริง
    */
-  function setRouteFilter(coordinates) {
-    if (!coordinates || !coordinates.length || !data) {
-      routeIndexes = null;
-    } else {
-      let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
-      for (const [lng, lat] of coordinates) {
-        if (lng < west) west = lng;
-        if (lng > east) east = lng;
-        if (lat < south) south = lat;
-        if (lat > north) north = lat;
-      }
-      // เผื่อขอบเท่ากับความกว้างของทางเดิน (องศาโดยประมาณ ~111 กม. ต่อ 1 องศา)
-      const pad = CORRIDOR_M / 111000;
+  /*
+   * หาจุดสถิติที่อยู่ริมเส้นทาง — ฟังก์ชันบริสุทธิ์ ไม่แตะสถานะใด ๆ
+   *
+   * แยกออกมาเพราะมีสองคนใช้: setRouteFilter() ที่เอาไปกรองสิ่งที่แสดง
+   * และโหมดจำลองที่ต้องเทียบหลายเส้นทางก่อนเลือก — ถ้าเทียบด้วยฟังก์ชัน
+   * ที่เปลี่ยนสถานะไปด้วย การเทียบเส้นที่สองจะไปลบผลของเส้นแรกทิ้ง
+   */
+  function matchRoute(coordinates) {
+    const out = [];
+    if (!coordinates || !coordinates.length || !data) return out;
 
-      const keep = new Set();
-      for (let i = 0; i < data.hotspots.length; i++) {
-        const h = data.hotspots[i];
-        if (h.lon < west - pad || h.lon > east + pad) continue;
-        if (h.lat < south - pad || h.lat > north + pad) continue;
-        for (const c of coordinates) {
-          if (U.distance([h.lon, h.lat], c) <= CORRIDOR_M) {
-            keep.add(i);
-            break;
-          }
+    const cumulative = [0];
+    for (let i = 1; i < coordinates.length; i++) {
+      cumulative[i] = cumulative[i - 1] + U.distance(coordinates[i - 1], coordinates[i]);
+    }
+
+    let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
+    for (const [lng, lat] of coordinates) {
+      if (lng < west) west = lng;
+      if (lng > east) east = lng;
+      if (lat < south) south = lat;
+      if (lat > north) north = lat;
+    }
+    // เผื่อขอบเท่ากับความกว้างของทางเดิน (องศาโดยประมาณ ~111 กม. ต่อ 1 องศา)
+    const pad = CORRIDOR_M / 111000;
+
+    for (let i = 0; i < data.hotspots.length; i++) {
+      const h = data.hotspots[i];
+      if (h.lon < west - pad || h.lon > east + pad) continue;
+      if (h.lat < south - pad || h.lat > north + pad) continue;
+
+      // หาพิกัดบนเส้นทางที่ใกล้จุดนี้ที่สุด เพื่อรู้ว่าอยู่ตรงไหนของเส้น
+      let bestDist = Infinity;
+      let bestAt = 0;
+      for (let k = 0; k < coordinates.length; k++) {
+        const d = U.distance([h.lon, h.lat], coordinates[k]);
+        if (d < bestDist) {
+          bestDist = d;
+          bestAt = k;
         }
       }
-      routeIndexes = keep;
+      if (bestDist > CORRIDOR_M) continue;
+
+      out.push({ idx: i, at: bestAt, along: cumulative[bestAt], offset: bestDist });
     }
+
+    out.sort((a, b) => a.along - b.along);
+    return out;
+  }
+
+  /* จำนวนจุดสถิติที่เส้นทางหนึ่งวิ่งผ่าน — ใช้เทียบเส้นทางโดยไม่เปลี่ยนสถานะ */
+  function countAlongRoute(coordinates) {
+    return matchRoute(coordinates).length;
+  }
+
+  /*
+   * ตัดเส้นทางให้เริ่มก่อนถึงจุดสถิติแรกไม่กี่ร้อยเมตร
+   *
+   * ใช้กับฉากสาธิต — ถ้าเริ่มขับจากต้นทางจริง กว่าจะถึงจุดแรกอาจกินเวลาหลายนาที
+   * ซึ่งไม่มีใครนั่งดูจนจบ ตัดให้เริ่มใกล้ ๆ แล้วคำเตือนจะโผล่ในไม่กี่วินาที
+   *
+   * lead ตั้งต่ำกว่า RouteRisk.WARN_AHEAD_M (500 ม.) เล็กน้อย เพื่อให้การ์ดเตือน
+   * ขึ้นตั้งแต่วินาทีแรก ๆ ไม่ต้องรอให้ขับเข้าไปในระยะก่อน
+   */
+  function trimToFirstSpot(coordinates, lead = 400) {
+    const spots = matchRoute(coordinates);
+    if (!spots.length) return coordinates;
+
+    const target = spots[0].at;
+    let back = 0;
+    let i = target;
+    while (i > 0 && back < lead) {
+      back += U.distance(coordinates[i - 1], coordinates[i]);
+      i--;
+    }
+    // เหลือน้อยกว่าสองพิกัดจะคำนวณทิศทางไม่ได้ ถอยไปใช้เส้นเต็มแทน
+    return coordinates.length - i >= 2 ? coordinates.slice(i) : coordinates;
+  }
+
+  function setRouteFilter(coordinates) {
+    routeSpots = matchRoute(coordinates);
+    routeIndexes = coordinates && coordinates.length && data
+      ? new Set(routeSpots.map((s) => s.idx))
+      : null;
 
     const map = window.MapView.instance;
     if (map && map.getSource(SOURCE)) {
@@ -451,6 +516,24 @@ window.Hotspots = (function () {
     return [...routeIndexes]
       .map((i) => data.hotspots[i])
       .sort((a, b) => b.severity - a.severity);
+  }
+
+  /*
+   * จุดสถิติที่กำลังจะถึงบนเส้นทาง — เทียบกับระยะที่วิ่งมาแล้ว
+   *
+   * ใช้ตรรกะเดียวกับ RouteRisk.upcoming() ทุกอย่าง รวมทั้งการยอมให้เลย
+   * จุดนั้นไปแล้ว 60 ม. ยังนับว่า "กำลังผ่าน" เพราะ GPS มีความคลาดเคลื่อน
+   * ถ้าตัดที่ 0 พอดี การ์ดเตือนจะกะพริบหายตอนขับผ่านจุดนั้นพอดี
+   */
+  function upcomingOnRoute(travelled, warnAhead) {
+    if (!data || !routeSpots.length) return null;
+    for (const s of routeSpots) {
+      const ahead = s.along - travelled;
+      if (ahead < -60) continue;
+      if (ahead > warnAhead) break;
+      return { spot: data.hotspots[s.idx], ahead: Math.max(0, ahead), idx: s.idx };
+    }
+    return null;
   }
 
   /* ---------- คำอธิบายสี ---------- */
@@ -530,6 +613,9 @@ window.Hotspots = (function () {
     setRouteFilter,
     routeCount,
     routeHotspots,
+    upcomingOnRoute,
+    countAlongRoute,
+    trimToFirstSpot,
     levelOf,
     classify,
     CATEGORIES,

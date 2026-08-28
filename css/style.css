@@ -1194,9 +1194,14 @@ button:active { transform: scale(0.96); }
 
 /* โหมดรายละเอียด: สลับเนื้อหาในแผ่นทั้งใบ ไม่มีการ์ดลอยซ้อนอีกชั้น */
 .sidebar.is-detail #btnBack { display: inline-flex; }
+/*
+ * #aiPanel ต้องอยู่ในรายการนี้ด้วย ไม่งั้นการ์ดพยากรณ์จะค้างอยู่เหนือ
+ * การ์ดรายละเอียด — ซึ่งเป็นคนละเรื่องกัน (พยากรณ์ตอบ "วันนี้เป็นวันแบบไหน"
+ * ส่วนการ์ดรายละเอียดตอบ "จุดที่เพิ่งแตะคืออะไร") เอามาซ้อนกันแล้วอ่านสับสน
+ */
 .sidebar.is-detail .sidebar__title,
-.sidebar.is-detail #typeChips,
 .sidebar.is-detail #riskPanel,
+.sidebar.is-detail #aiPanel,
 .sidebar.is-detail #hazardList,
 .sidebar.is-detail .sidebar__foot { display: none; }
 
@@ -3280,3 +3285,61 @@ body.picking .phone > #map::after {
   border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
 }
 .hotspot-card__stats > div.is-fatal strong { color: var(--danger); }
+
+/* ---------- จุดเสี่ยงจากสถิติในแผ่นรายการ ---------- */
+
+/* เส้นคั่นบอกว่าต่อจากนี้เป็นข้อมูลคนละชนิด ไม่ใช่รายงานที่คนเพิ่งแจ้ง */
+.list-divider {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 14px 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.list-divider span {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--text-dim);
+}
+.list-divider small { font-size: 10px; color: var(--text-dim); opacity: 0.75; }
+
+/* ขอบประแบบเดียวกับหมุดบนแผนที่ ผู้ใช้จะได้เชื่อมโยงได้ว่าเป็นของชุดเดียวกัน */
+.hazard-item--stat .hazard-item__icon {
+  border-style: dashed;
+}
+
+.src-tag--stat {
+  color: var(--accent-2);
+  background: var(--accent-2-soft);
+  border-color: color-mix(in srgb, var(--accent-2) 35%, transparent);
+}
+
+.hazard-item__risk--stat strong { color: var(--item-color); }
+
+/* ป้ายบนการ์ดเตือนระหว่างขับ บอกว่าจุดนี้มาจากสถิติ ไม่ใช่คนเพิ่งแจ้ง */
+.nav-hazard__tag {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 1px 5px;
+  margin-left: 5px;
+  border-radius: 999px;
+  vertical-align: middle;
+  color: var(--accent-2);
+  background: var(--accent-2-soft);
+  border: 1px solid color-mix(in srgb, var(--accent-2) 35%, transparent);
+}
+
+/* ป้ายบอกชนิดความเสี่ยงของเส้นทางในฉากสาธิต */
+.route-opt__badge--both {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+}
+.route-opt__badge--ai {
+  color: var(--accent-2);
+  background: var(--accent-2-soft);
+}

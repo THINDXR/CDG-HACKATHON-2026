@@ -47,65 +47,6 @@ window.UI = (function () {
     $('#btnFilter').title = filtering
       ? `คัดกรองอยู่ — แสดง ${active.size} จาก ${typeCount} ประเภท`
       : 'คัดกรองประเภทภัย';
-
-    renderTypeChips();
-  }
-
-  /* ---------- แถบชิปเลือกประเภท (ปัดซ้าย-ขวาได้) ---------- */
-
-  /**
-   * แถวชิปในหัวแผ่น: "ทั้งหมด" ตามด้วยประเภทภัยทีละอัน
-   *
-   * กดชิปประเภท = แสดงเฉพาะประเภทนั้นอย่างเดียว (ไม่ใช่เปิด/ปิดทีละอันสะสมกัน)
-   * กดซ้ำที่ชิปที่เลือกอยู่ หรือกด "ทั้งหมด" = กลับไปแสดงครบทุกประเภท
-   * แถวนี้เลื่อนแนวนอนในตัวเอง จึงไม่มีทางล้นออกนอกขอบขวาของจอ
-   */
-  function renderTypeChips() {
-    const box = $('#typeChips');
-    if (!box) return;
-
-    const active = window.Store.state.activeTypes;
-    const counts = window.Store.countsByType();
-    const showingAll = active.size === typeCount;
-    // "เลือกอยู่ประเภทเดียว" คือสถานะที่ชิปนั้นควรถูกไฮไลต์
-    const only = active.size === 1 ? [...active][0] : null;
-
-    box.innerHTML = '';
-
-    const allChip = el('button', 'chip');
-    allChip.type = 'button';
-    allChip.setAttribute('role', 'tab');
-    allChip.setAttribute('aria-selected', String(showingAll));
-    allChip.classList.toggle('is-on', showingAll);
-    allChip.innerHTML = `ทั้งหมด <span class="chip__n">${window.Store.state.reports.length}</span>`;
-    allChip.addEventListener('click', () => window.Store.setAllTypes(true));
-    box.appendChild(allChip);
-
-    for (const [key, def] of Object.entries(CFG.HAZARD_TYPES)) {
-      const n = counts[key] || 0;
-      const chip = el('button', 'chip chip--type');
-      chip.type = 'button';
-      chip.setAttribute('role', 'tab');
-      chip.dataset.type = key;
-      chip.style.setProperty('--chip-color', def.color);
-      const on = only === key;
-      chip.setAttribute('aria-selected', String(on));
-      chip.classList.toggle('is-on', on);
-      chip.classList.toggle('is-empty', n === 0);
-      chip.innerHTML = `
-        <span class="chip__icon">${def.icon}</span>
-        ${escapeHtml(def.label)}
-        <span class="chip__n">${n}</span>`;
-
-      chip.addEventListener('click', () => {
-        if (only === key) window.Store.setAllTypes(true);
-        else window.Store.setOnlyType(key);
-      });
-      box.appendChild(chip);
-
-      // เลื่อนชิปที่เพิ่งเลือกให้เข้ามาอยู่ในสายตา เผื่อมันอยู่นอกจอทางขวา
-      if (on) requestAnimationFrame(() => chip.scrollIntoView({ inline: 'center', block: 'nearest' }));
-    }
   }
 
   /* ---------- ที่มาของรายงาน ---------- */
@@ -135,20 +76,30 @@ window.UI = (function () {
     return CFG.DEFAULT_CENTER;
   }
 
+  /*
+   * แผ่นนี้ชื่อ "ความปลอดภัยรอบตัว" ทุกอย่างในนั้นจึงต้องอยู่บนฐานเดียวกัน
+   * คือรัศมี 5 กม. เท่ากับที่การ์ดคะแนนใช้ และรวมทั้งสองแหล่งเหมือนกัน:
+   * รายงานที่คนแจ้ง + จุดเสี่ยงจากสถิติ
+   *
+   * เดิมรายการนับทุกรายงานที่มีในเครื่องไม่สนระยะ เลยเกิดภาพที่ขัดกันเอง —
+   * หัวแผ่นบอก "ทั้งหมด 14" แต่การ์ดใต้มันบอก "0 รายงานในรัศมี 5 กม."
+   */
   function renderList() {
     const list = $('#hazardList');
-    const items = window.Store.sortedByDistance(origin());
+    const here = origin();
+    const items = window.Store.nearbyReports(here);
+    const spots = window.Hotspots.near(here, 5000, 20);
     const selectedId = window.Store.state.selectedId;
 
-    $('#sidebarCount').textContent = items.length;
+    $('#sidebarCount').textContent = items.length + spots.length;
     list.innerHTML = '';
 
-    if (!items.length) {
+    if (!items.length && !spots.length) {
       const empty = el('li', 'empty-state');
       const searching = window.Store.state.search.trim();
       empty.innerHTML = searching
         ? `<div>${window.Icons.get('search')}</div><p>ไม่พบรายงานที่ตรงกับ “${escapeHtml(searching)}”<br />ลองคำอื่น หรือล้างช่องค้นหา</p>`
-        : `<div>${window.Icons.get('map')}</div><p>ยังไม่มีรายงานที่ตรงกับตัวกรอง<br />ลองเปิดตัวกรองเพิ่ม หรือกด “แจ้งเหตุ”</p>`;
+        : `<div>${window.Icons.get('map')}</div><p>ไม่มีจุดเสี่ยงในรัศมี 5 กม.<br />เลื่อนแผนที่ไปดูที่อื่น หรือกด “แจ้งเหตุ”</p>`;
       list.appendChild(empty);
     }
 
@@ -190,6 +141,45 @@ window.UI = (function () {
         // ถ้าบินก่อน มันจะเล็งด้วยขนาดแผ่นเดิม พอแผ่นกางขึ้นมาก็ทับหมุดพอดี
         collapseToMap();
         window.MapView.flyToReport(item);
+      });
+      list.appendChild(li);
+    }
+
+    /*
+     * จุดเสี่ยงจากสถิติต่อท้าย มีหัวข้อคั่นให้เห็นว่าเป็นคนละชนิดข้อมูล
+     * — ของบนคือสิ่งที่คนเพิ่งแจ้ง ของล่างคือที่ที่เคยเกิดซ้ำมา 4 ปี
+     */
+    if (spots.length) {
+      const head = el('li', 'list-divider');
+      head.innerHTML = `<span>จุดเสี่ยงจากสถิติ</span><small>${spots.length} จุดในรัศมี 5 กม.</small>`;
+      list.appendChild(head);
+    }
+
+    for (const spot of spots) {
+      const cat = window.Hotspots.classify(spot);
+      const li = el('li', 'hazard-item hazard-item--stat');
+      li.style.setProperty('--item-color', cat.color);
+      li.innerHTML = `
+        <div class="hazard-item__icon">${window.Icons.get(cat.icon)}</div>
+        <div class="hazard-item__body">
+          <div class="hazard-item__top">
+            <strong>${escapeHtml(cat.label)}</strong>
+            <span class="src-tag src-tag--stat">สถิติ</span>
+          </div>
+          <div class="hazard-item__road">${escapeHtml(spot.road || spot.province)}</div>
+          <div class="hazard-item__meta">
+            <span>${U.formatDistance(spot.distance)}</span>
+            <span>เกิด ${spot.accidents} ครั้ง</span>
+            ${spot.dead ? `<span>เสียชีวิต ${spot.dead}</span>` : ''}
+          </div>
+        </div>
+        <span class="hazard-item__risk hazard-item__risk--stat" title="ข้อมูลจากสถิติอุบัติเหตุจริง">
+          <strong>${spot.accidents}</strong>
+          <em>ครั้ง</em>
+        </span>`;
+      li.addEventListener('click', () => {
+        collapseToMap();
+        window.UI.showHotspot(spot);
       });
       list.appendChild(li);
     }
@@ -623,13 +613,25 @@ window.UI = (function () {
    * กลุ่มรถติดวางติดกันสามจุดเพื่อให้เส้นทางบนแผนที่ระบายเป็นแถบสียาวพอให้เห็นชัด
    * (จุดเดียวจะได้แถบสั้นมากจนไม่รู้ว่าเปลี่ยนสี)
    */
-  function buildDemoScenario(routes) {
-    const main = routes[0];
-    const divergeAlong = main.cumulative[firstDivergence(main, routes[1])] || 0;
+  function buildDemoScenario(routes, mainIndex = 0, statOnlyIndex = null) {
+    // วางฉากลงบนเส้นที่เลือกไว้ ไม่ใช่เส้นที่เร็วที่สุดเสมอไป
+    // (ผู้เรียกเลือกเส้นที่ผ่านจุดสถิติมากที่สุด เพื่อให้เจอครบทั้งสองแหล่ง)
+    const main = routes[mainIndex] || routes[0];
+
+    /*
+     * แยกทางจาก "เส้นที่ต้องสะอาด" เป็นหลัก
+     *
+     * ถ้าวัดจากเส้นอื่นแล้ววางของก่อนจุดแยก รายงานจะไปตกบนช่วงถนนที่ใช้ร่วมกัน
+     * แล้วเส้นที่ตั้งใจให้มีแต่จุดจากโมเดล ก็จะมีรายงานของคนปนเข้าไปด้วย
+     * ซึ่งทำให้การเทียบสองเส้นไม่มีความหมาย
+     */
+    const avoid = statOnlyIndex != null ? routes[statOnlyIndex] : null;
+    const other = avoid || routes.find((r) => r !== main) || routes[0];
+    const divergeAlong = main.cumulative[firstDivergence(main, other)] || 0;
     const now = Date.now();
 
     const plan = [
-      { from: 'start', at: 700, type: 'accident', severity: 'high', note: 'รถชนประสานงา ปิด 2 เลน รอเจ้าหน้าที่', ageMin: 6, confirms: 14 },
+      { from: 'diverge', at: 150, type: 'accident', severity: 'high', note: 'รถชนประสานงา ปิด 2 เลน รอเจ้าหน้าที่', ageMin: 6, confirms: 14 },
       { from: 'diverge', at: 300, type: 'traffic', severity: 'medium', note: 'ท้ายแถวยาว รถเคลื่อนตัวช้ามาก', ageMin: 4, confirms: 9 },
       { from: 'diverge', at: 700, type: 'traffic', severity: 'medium', note: 'รถติดสะสมจากอุบัติเหตุข้างหน้า', ageMin: 3, confirms: 7 },
       { from: 'diverge', at: 1100, type: 'traffic', severity: 'medium', note: 'ติดยาวถึงแยกหน้า', ageMin: 5, confirms: 6 },
@@ -680,7 +682,37 @@ window.UI = (function () {
 
     try {
       const routes = await window.Route.getRoutes(trip.from, trip.to);
-      window.Store.setDemoReports(buildDemoScenario(routes));
+
+      /*
+       * ฉากสาธิตต้องโชว์ทั้งสองแหล่งความเสี่ยงในการขับรอบเดียว
+       *
+       * จุดจากโมเดลอยู่ที่ไหนเราเลือกไม่ได้ (มันคือสถิติจริง) แต่รายงานของผู้ใช้
+       * เราวางเองได้ จึงเลือกเส้นทางที่ผ่านจุดสถิติมากที่สุดก่อน แล้วค่อยวาง
+       * รายงานสาธิตลงบนเส้นเดียวกัน — ขับรอบเดียวจะเจอทั้งคำเตือนจากคนแจ้ง
+       * และคำเตือนจากจุดที่โมเดลชี้
+       */
+      const withCounts = routes.map((r, i) => ({
+        i,
+        n: window.Hotspots.countAlongRoute(r.coordinates),
+      }));
+      const ranked = [...withCounts].sort((a, b) => b.n - a.n);
+
+      /*
+       * เส้นที่หนึ่ง = โดนทั้งสองแหล่ง (วางรายงานสาธิตลงไป)
+       * เส้นที่สอง  = โดนเฉพาะจุดที่โมเดลชี้ ไม่มีรายงานของคนเลย
+       *
+       * มีไว้ให้เทียบกันตรง ๆ ว่าเส้นที่ "ไม่มีใครแจ้งอะไรเลย" ก็ยังมีความเสี่ยง
+       * ที่โมเดลมองเห็นอยู่ ซึ่งเป็นประเด็นทั้งหมดของการมีโมเดล
+       */
+      const best = ranked[0] || { i: 0, n: 0 };
+      const statOnly = ranked.find((r) => r.i !== best.i && r.n > 0) || null;
+
+      demoRouteIndex = best.n > 0 ? best.i : 0;
+      demoStatOnlyIndex = statOnly ? statOnly.i : null;
+
+      window.Store.setDemoReports(
+        buildDemoScenario(routes, demoRouteIndex, demoStatOnlyIndex),
+      );
 
       // วางตัวผู้ใช้ที่จุดเริ่ม เพื่อให้ทุกอย่างคิดจากตรงนั้น ไม่ใช่จากกลางจอ
       const head = U.bearing(routes[0].coordinates[0], routes[0].coordinates[1] || trip.to);
@@ -688,8 +720,15 @@ window.UI = (function () {
       setView('map');
 
       openTripSheet(
-        { name: trip.label, detail: 'ฉากสาธิต — มีอุบัติเหตุและรถติดอยู่บนเส้นทางที่เร็วที่สุด', lng: trip.to[0], lat: trip.to[1] },
-        { routes, simulate: true }
+        {
+          name: trip.label,
+          detail: demoStatOnlyIndex != null
+            ? `ฉากสาธิต — เทียบสองเส้น: เส้นหนึ่งมีทั้งรายงานและจุดจากโมเดล ${best.n} จุด อีกเส้นมีแต่จุดจากโมเดล ${statOnly.n} จุด`
+            : `ฉากสาธิต — เส้นนี้มีทั้งรายงานจากผู้ใช้และจุดเสี่ยงที่โมเดลชี้ ${best.n} จุด`,
+          lng: trip.to[0],
+          lat: trip.to[1],
+        },
+        { routes, simulate: true, pick: demoRouteIndex }
       );
     } catch (_) {
       /*
@@ -780,8 +819,29 @@ window.UI = (function () {
       return;
     }
 
-    const def = CFG.HAZARD_TYPES[hit.report.type];
-    const sev = CFG.SEVERITY[hit.report.severity];
+    /*
+     * การ์ดใบเดียวใช้ได้ทั้งรายงานของคนและจุดเสี่ยงจากสถิติ
+     * แต่ต้องบอกให้ชัดว่าอันไหนเป็นอันไหน — "มีคนแจ้งว่าเกิดตอนนี้"
+     * กับ "ที่นี่เคยเกิดมาแล้ว 12 ครั้ง" เป็นข้อมูลคนละน้ำหนักในการตัดสินใจ
+     */
+    const isStat = hit.isStat === true;
+
+    /*
+     * พาดหัวของการ์ดเตือนต้องบอก "ให้ทำอะไร" ไม่ใช่ "นี่คืออะไร"
+     *
+     * คนขับมีเวลาชายตามองแค่เสี้ยววินาที "ทางตรง ใช้ความเร็ว" ต้องแปลต่อเองว่า
+     * แล้วยังไง ส่วน "ลดความเร็ว" ลงมือได้ทันที ชื่อประเภทย้ายไปอยู่บรรทัดล่าง
+     */
+    const def = isStat
+      ? {
+          label: hit.category.action || hit.category.label,
+          icon: window.Icons.get(hit.category.icon),
+          color: hit.category.color,
+        }
+      : CFG.HAZARD_TYPES[hit.report.type];
+    const sev = isStat
+      ? { label: `${hit.category.label} · เคยเกิด ${hit.spot.accidents} ครั้ง` }
+      : CFG.SEVERITY[hit.report.severity];
 
     /*
      * ระยะแยกตัวเลขกับหน่วย เพื่อให้ตัวเลขตัวใหญ่โดดออกมาอ่านได้ด้วยการชายตามอง
@@ -809,7 +869,10 @@ window.UI = (function () {
     box.innerHTML = `
       <span class="nav-hazard__icon">${def.icon}</span>
       <span class="nav-hazard__text">
-        <strong>${escapeHtml(def.label)}</strong>
+        <strong>
+          ${escapeHtml(def.label)}
+          ${isStat ? '<em class="nav-hazard__tag">สถิติ</em>' : ''}
+        </strong>
         <small>
           <span class="nav-hazard__sev">${escapeHtml(sev.label)}</span>
           ${escapeHtml(hit.road)}
@@ -1450,6 +1513,10 @@ window.UI = (function () {
   let tripPlace = null;     // จุดหมายที่กำลังดูอยู่
   let tripRoutes = [];      // เส้นทางทั้งหมดที่ OSRM ให้มา (ตัวแรก = เร็วที่สุด)
   let tripPick = 0;         // ผู้ใช้เลือกเส้นไหนอยู่
+  // เส้นที่ฉากสาธิตวางของไว้ — ต้องเป็นเส้นเดียวกับที่แผ่นทริปเลือกให้ตั้งแต่แรก
+  let demoRouteIndex = 0;
+  // เส้นที่ตั้งใจให้มีแต่จุดจากโมเดล ไม่มีรายงานของคนเลย (null = ไม่มีเส้นแบบนั้น)
+  let demoStatOnlyIndex = null;
   let tripVehicle = 'car';
   let tripSimulate = false; // เปิดมาจากโหมดจำลอง = กดเริ่มแล้วให้ขับให้ดูเลย
 
@@ -1462,7 +1529,8 @@ window.UI = (function () {
   async function openTripSheet(place, opts = {}) {
     tripPlace = place;
     tripRoutes = [];
-    tripPick = 0;
+    // ฉากสาธิตวางของไว้บนเส้นหนึ่งโดยเฉพาะ จึงต้องเปิดมาที่เส้นนั้น
+    tripPick = opts.pick || 0;
     tripSimulate = !!opts.simulate;
 
     $('#tripName').textContent = place.name;
@@ -1529,11 +1597,41 @@ window.UI = (function () {
    *
    * ถ้าโมเดลยังโหลดไม่เสร็จหรือใช้ไม่ได้ ทุกอย่างกลับไปเป็นคะแนนเดิมเป๊ะ ๆ
    */
+  /*
+   * จุดที่โมเดลชี้ต้องมีน้ำหนักในคะแนนเส้นทางด้วย
+   *
+   * RouteRisk นับเฉพาะรายงานของคน เส้นทางที่ไม่มีใครแจ้งอะไรเลยจึงได้ 2%
+   * แล้วขึ้นว่า "ปลอดภัย" ทั้งที่วิ่งผ่านจุดที่เคยเกิดอุบัติเหตุมาแล้ว 21 ครั้ง
+   * ซึ่งเป็นการบอกผู้ใช้ผิดในทางที่อันตราย — บอกว่าปลอดภัยแล้วเขาไม่ระวัง
+   *
+   * ถ่วงน้ำหนักด้วยความรุนแรง (ตาย×10 + เจ็บ) ไม่ใช่จำนวนจุด เพราะจุดที่
+   * เกิดบ่อยแต่เจ็บเล็กน้อยไม่ควรดันคะแนนเท่าจุดที่ชนทีไรถึงตาย
+   */
+  function statRouteScore(baseScore) {
+    const spots = window.Hotspots.routeHotspots();
+    if (!spots.length) return baseScore;
+
+    const weight = spots.reduce((sum, h) => sum + Math.min(1, h.severity / 60), 0);
+    // เส้นโค้งอิ่มตัว: 1 จุดหนัก ≈ +23 แต้ม, 4 จุด ≈ +55 แต้ม, ไม่พุ่งชน 100 ง่าย ๆ
+    const add = 100 * (1 - Math.exp(-weight / 4));
+    const scored = Math.round(Math.min(100, baseScore + (100 - baseScore) * (add / 100)));
+
+    /*
+     * พื้นขั้นต่ำ: มีจุดสถิติบนเส้นทางแล้วห้ามขึ้นว่า "ปลอดภัย"
+     *
+     * จุดที่เบาที่สุดในชุดนี้ก็ยังหมายถึงมีคนเจ็บจากอุบัติเหตุซ้ำ ๆ ที่เดิม
+     * อย่างน้อย 4 ครั้ง การบอกว่าเส้นทางปลอดภัยแล้วผู้ใช้เลิกระวังเป็นความผิด
+     * ที่แพงกว่าการเตือนเกินไปหน่อย — 20 คือเกณฑ์ต่ำสุดของระดับ "ต้องระวัง"
+     */
+    return Math.max(scored, 20);
+  }
+
   function tripBlend(analysis) {
     const forecast = window.AIUI?.currentForecast?.() || null;
-    const blended = window.AIForecast.blendRouteScore(analysis.score, forecast);
+    const withStats = statRouteScore(analysis.score);
+    const blended = window.AIForecast.blendRouteScore(withStats, forecast);
 
-    if (!blended.adjusted) {
+    if (!blended.adjusted && withStats === analysis.score) {
       return {
         score: analysis.score,
         levelKey: analysis.level.key,
@@ -1544,6 +1642,24 @@ window.UI = (function () {
     }
 
     const level = window.RouteRisk.levelFor(blended.score);
+
+    // มีแต่จุดสถิติ ไม่มีผลจากพยากรณ์รายวัน — อธิบายเท่าที่มีจริง
+    if (!blended.adjusted) {
+      const spots = window.Hotspots.routeHotspots();
+      return {
+        score: blended.score,
+        levelKey: level.key,
+        levelLabel: level.label,
+        color: level.color,
+        note: `
+          <p class="trip-ai" style="--ai-color:var(--accent-2)">
+            <strong>${spots.length} จุดเสี่ยงจากสถิติบนเส้นทางนี้</strong>
+            เคยเกิดอุบัติเหตุรวม ${spots.reduce((n, h) => n + h.accidents, 0)} ครั้ง
+            จึงเพิ่มคะแนนเสี่ยงไป ${blended.score - analysis.score} จุด
+            (จาก ${analysis.score}%)
+          </p>`,
+      };
+    }
     const reason = forecast.reasons[0];
     const direction = blended.delta > 0 ? 'เพิ่ม' : 'ลด';
 
@@ -1634,9 +1750,20 @@ window.UI = (function () {
     const fastest = all[0];
     const rows = all.map((a, i) => {
       const slower = a.duration - fastest.duration;
-      const badge = a === verdict.safest && verdict.safest !== fastest
-        ? '<em class="route-opt__badge route-opt__badge--safe">ปลอดภัยกว่า</em>'
-        : i === 0 ? '<em class="route-opt__badge">เร็วที่สุด</em>' : '';
+      /*
+       * ในฉากสาธิตป้ายบอก "เส้นนี้มีความเสี่ยงชนิดไหน" สำคัญกว่าบอกว่าเร็วหรือปลอดภัย
+       * เพราะทั้งฉากมีไว้เทียบสองแหล่งข้อมูลให้เห็น ไม่ใช่ให้เลือกเส้นที่ดีที่สุด
+       */
+      let badge;
+      if (tripSimulate && i === demoRouteIndex) {
+        badge = '<em class="route-opt__badge route-opt__badge--both">รายงาน + โมเดล</em>';
+      } else if (tripSimulate && i === demoStatOnlyIndex) {
+        badge = '<em class="route-opt__badge route-opt__badge--ai">เฉพาะโมเดล</em>';
+      } else if (a === verdict.safest && verdict.safest !== fastest) {
+        badge = '<em class="route-opt__badge route-opt__badge--safe">ปลอดภัยกว่า</em>';
+      } else {
+        badge = i === 0 ? '<em class="route-opt__badge">เร็วที่สุด</em>' : '';
+      }
 
       return `
         <button type="button" class="route-opt${i === tripPick ? ' is-active' : ''}"
@@ -1847,6 +1974,22 @@ window.UI = (function () {
       const dest = { lng: tripPlace.lng, lat: tripPlace.lat, label: tripPlace.name };
       const vehicle = tripVehicle;
       const simulate = tripSimulate;
+
+      /*
+       * เส้น "เฉพาะโมเดล" ไม่มีรายงานสาธิตวางไว้ให้เจอระหว่างทาง
+       * ถ้าเริ่มขับจากต้นทางจริงอาจต้องรอหลายนาทีกว่าจะถึงจุดแรก
+       * จึงเริ่มที่ราว 400 ม. ก่อนถึงจุดสถิติจุดแรก — คำเตือนจะขึ้นในไม่กี่วินาที
+       * (400 ม. ต่ำกว่าระยะเตือนล่วงหน้า 500 ม. เล็กน้อย)
+       */
+      const startAtRisk = simulate && tripPick === demoStatOnlyIndex;
+      const drivePath = startAtRisk
+        ? window.Hotspots.trimToFirstSpot(preRoute.coordinates)
+        : preRoute.coordinates;
+
+      if (startAtRisk && drivePath !== preRoute.coordinates) {
+        const head = U.bearing(drivePath[0], drivePath[1]);
+        window.Store.setUserPosition(drivePath[0], head, 0);
+      }
       // เคลียร์ก่อนปิด ไม่งั้น closeTripSheet จะไปลบจุดของฉากที่กำลังจะใช้ขับทิ้ง
       tripSimulate = false;
       closeTripSheet();
@@ -1855,7 +1998,7 @@ window.UI = (function () {
 
       // ฉากสาธิต: ขับตามเส้นที่ผู้ใช้เพิ่งเลือก หัวลูกศรจึงขนานกับถนนเสมอ
       if (simulate && window.Navigate.isActive) {
-        window.Alerts.startSimulation(preRoute.coordinates);
+        window.Alerts.startSimulation(drivePath);
         syncSettings();
         syncStatusButtons();
       }
@@ -1980,7 +2123,6 @@ window.UI = (function () {
     showDetailSheet: collapseToMap,
 
     renderFilterSheet,
-    renderTypeChips,
     syncFilters,
     syncStatusButtons,
     showAlert,

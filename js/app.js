@@ -166,15 +166,6 @@
         window.UI.renderDetail();
       }
 
-      /*
-       * ตัวเลขบนชิปเปลี่ยนเฉพาะตอนจำนวนรายงานเปลี่ยน จึงวาดใหม่เท่าที่จำเป็น
-       * (renderList ถูกเรียกทุก 2 วิระหว่างติดตามตำแหน่ง ถ้าวาดชิปด้วยจะรีเซ็ต
-       * ตำแหน่งที่ผู้ใช้ปัดแถบชิปไว้ทุกครั้ง) ส่วนกรณี 'filter' syncFilters จัดการเอง
-       */
-      if (['load', 'reset', 'add', 'remove'].includes(reason)) {
-        window.UI.renderTypeChips();
-      }
-
       if (reason === 'position') {
         window.MapView.setUserPuck(state.userPosition, state.userHeading);
 
