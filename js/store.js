@@ -42,10 +42,27 @@ window.Store = (function () {
 
   function persist() {
     try {
-      localStorage.setItem(CFG.STORAGE_KEY, JSON.stringify(state.reports));
+      // จุดของฉากสาธิตมีอายุแค่ตอนเปิดโหมดจำลอง ไม่ควรค้างอยู่ในเครื่องผู้ใช้
+      localStorage.setItem(CFG.STORAGE_KEY, JSON.stringify(state.reports.filter((r) => !r.demo)));
     } catch (_) {
       /* โหมดส่วนตัวอาจเขียนไม่ได้ — ไม่ถือเป็นข้อผิดพลาดร้ายแรง */
     }
+  }
+
+  /**
+   * ใส่จุดของฉากสาธิต (โหมดจำลองการขับ) แบบชั่วคราว
+   * ตั้งใจไม่บันทึกลง localStorage และล้างทิ้งทันทีที่ปิดโหมดจำลอง
+   * เพื่อไม่ให้ข้อมูลสาธิตปนกับรายงานจริงของผู้ใช้
+   */
+  function setDemoReports(list) {
+    state.reports = [...list.map((r) => ({ ...r, demo: true })), ...state.reports.filter((r) => !r.demo)];
+    emit('add');
+  }
+
+  function clearDemoReports() {
+    if (!state.reports.some((r) => r.demo)) return;
+    state.reports = state.reports.filter((r) => !r.demo);
+    emit('remove');
   }
 
   /** ลบรายงานที่หมดอายุออก */
@@ -372,6 +389,8 @@ window.Store = (function () {
     prune,
     addReport,
     removeReport,
+    setDemoReports,
+    clearDemoReports,
     vote,
     toggleType,
     setAllTypes,

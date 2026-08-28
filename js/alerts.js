@@ -101,6 +101,19 @@ window.Alerts = (function () {
 
   /* ---------- โหมดจำลองการขับ (ใช้เดโมบนเดสก์ท็อป) ---------- */
 
+  /*
+   * เส้นทางของ "ฉากสาธิต" — ต้นทางฝั่งตะวันตกไปปลายทางฝั่งตะวันออกของกรุงเทพฯ
+   *
+   * ตั้งใจใช้แค่สองจุด (ไม่มีจุดแวะ) เพราะ OSRM จะให้เส้นทางสำรองมาเทียบ
+   * เฉพาะตอนขอแบบสองจุดเท่านั้น — ฉากนี้ต้องมีเส้นทางให้เลือกอย่างน้อยสองเส้น
+   * ถึงจะโชว์การเลี่ยงจุดเสี่ยงได้ และระยะต้องยาวพอที่เส้นทางจะแยกกันจริง
+   */
+  const SIM_TRIP = {
+    from: [100.4500, 13.7200],
+    to: [100.6500, 13.7800],
+    label: 'ปลายทางเส้นทางสาธิต',
+  };
+
   const SIM_WAYPOINTS = [
     [100.4985, 13.7430],
     [100.5060, 13.7452],
@@ -176,6 +189,8 @@ window.Alerts = (function () {
       simTimer = null;
     }
     if (window.Store.state.simulating) window.Store.setSimulating(false);
+    // จุดของฉากสาธิตต้องหายไปพร้อมกับโหมดจำลอง ไม่ปนกับรายงานจริงของผู้ใช้
+    window.Store.clearDemoReports();
     window.MapView.setSimRoute(null);
   }
 
@@ -307,6 +322,7 @@ window.Alerts = (function () {
   return {
     settings,
     SIM_WAYPOINTS,
+    SIM_TRIP,
     setSetting,
     startTracking,
     stopTracking,

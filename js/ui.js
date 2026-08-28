@@ -413,12 +413,102 @@ window.UI = (function () {
     syncSettings();
   }
 
+  /* ---------- ฉากสาธิตของโหมดจำลองการขับ ---------- */
+
+  /** ดัชนีจุดบนเส้นทางที่ระยะสะสมใกล้ค่าที่ต้องการที่สุด */
+  function indexAtAlong(route, meters) {
+    const cum = route.cumulative;
+    for (let i = 0; i < cum.length; i++) if (cum[i] >= meters) return i;
+    return cum.length - 1;
+  }
+
+  /** ชื่อถนนของช่วงที่ครอบจุดนี้อยู่ */
+  function roadNameAt(route, index) {
+    let name = '';
+    for (const step of route.steps) {
+      if (step.startIndex <= index) name = step.roadName || name;
+      else break;
+    }
+    return name || 'ถนนเส้นทางสาธิต';
+  }
+
+  /**
+   * จุดแรกบนเส้นทางหลักที่ "แยกออกจากเส้นทางสำรองแล้วจริง ๆ"
+   *
+   * ต้องวางจุดเสี่ยงหลังจุดนี้เท่านั้น ไม่งั้นจุดจะไปตกบนช่วงที่ทั้งสองเส้นใช้ร่วมกัน
+   * แล้วเส้นทางสำรองก็จะเสี่ยงเท่ากัน — สาธิตการเลี่ยงเส้นทางไม่ได้เลย
+   */
+  function firstDivergence(main, alt) {
+    if (!alt) return 0;
+    for (let i = 0; i < main.coordinates.length; i++) {
+      let nearest = Infinity;
+      // สุ่มเทียบทีละ 5 จุดก็พอ เส้นทางละเอียดกว่านั้นอยู่แล้ว
+      for (let j = 0; j < alt.coordinates.length; j += 5) {
+        const d = U.distance(main.coordinates[i], alt.coordinates[j]);
+        if (d < nearest) nearest = d;
+        if (nearest <= 250) break;
+      }
+      if (nearest > 250) return i;
+    }
+    return 0;
+  }
+
+  /**
+   * สร้างจุดเสี่ยงของฉากสาธิตลงบน "เส้นทางที่เร็วที่สุด"
+   *
+   * วางบนพิกัดจริงที่ OSRM คืนมา ไม่ใช่พิกัดตายตัวที่จดไว้ล่วงหน้า
+   * ฉากจึงทำงานได้เสมอไม่ว่า OSRM จะให้เส้นทางแบบไหนมาในวันนั้น
+   *
+   * จุดยึดมีสองแบบ:
+   *  - start    วัดจากต้นทาง ใช้กับอุบัติเหตุจุดแรก ให้เจอการเตือนภายในไม่กี่วินาที
+   *             ไม่ต้องรอขับไปหลายกิโลก่อนถึงจะได้เห็นอะไร
+   *  - diverge  วัดจากจุดที่เส้นทางสองเส้นแยกจากกัน ใช้กับกลุ่มที่ต้องทำให้
+   *             "เส้นทางสำรองปลอดภัยกว่าจริง" ถ้าไปวางบนช่วงที่ใช้ถนนร่วมกัน
+   *             ทั้งสองเส้นจะเสี่ยงเท่ากัน แล้วสาธิตการเลี่ยงเส้นทางไม่ได้เลย
+   *
+   * กลุ่มรถติดวางติดกันสามจุดเพื่อให้เส้นทางบนแผนที่ระบายเป็นแถบสียาวพอให้เห็นชัด
+   * (จุดเดียวจะได้แถบสั้นมากจนไม่รู้ว่าเปลี่ยนสี)
+   */
+  function buildDemoScenario(routes) {
+    const main = routes[0];
+    const divergeAlong = main.cumulative[firstDivergence(main, routes[1])] || 0;
+    const now = Date.now();
+
+    const plan = [
+      { from: 'start', at: 700, type: 'accident', severity: 'high', note: 'รถชนประสานงา ปิด 2 เลน รอเจ้าหน้าที่', ageMin: 6, confirms: 14 },
+      { from: 'diverge', at: 300, type: 'traffic', severity: 'medium', note: 'ท้ายแถวยาว รถเคลื่อนตัวช้ามาก', ageMin: 4, confirms: 9 },
+      { from: 'diverge', at: 700, type: 'traffic', severity: 'medium', note: 'รถติดสะสมจากอุบัติเหตุข้างหน้า', ageMin: 3, confirms: 7 },
+      { from: 'diverge', at: 1100, type: 'traffic', severity: 'medium', note: 'ติดยาวถึงแยกหน้า', ageMin: 5, confirms: 6 },
+      { from: 'diverge', at: 2600, type: 'flood', severity: 'high', note: 'น้ำท่วมขังสูงราว 30 ซม. รถเล็กเลี่ยง', ageMin: 25, confirms: 11 },
+    ];
+
+    return plan.map((p) => {
+      const i = indexAtAlong(main, (p.from === 'start' ? 0 : divergeAlong) + p.at);
+      const [lng, lat] = main.coordinates[i];
+      return {
+        id: U.uid(),
+        type: p.type,
+        severity: p.severity,
+        lng,
+        lat,
+        road: roadNameAt(main, i),
+        note: p.note,
+        radius: CFG.HAZARD_TYPES[p.type].defaultRadius,
+        createdAt: now - p.ageMin * 60000,
+        confirms: p.confirms,
+        denies: 0,
+        mine: false,
+        source: 'user',
+      };
+    });
+  }
+
   /**
    * เปิด/ปิดโหมดจำลองการขับ
    *
-   * เปิดแล้วพาเข้าหน้านำทางเลย ไม่ใช่แค่ขยับหมุดอยู่บนหน้าแผนที่ และให้รถวิ่งตาม
-   * "เส้นทางจริงที่ OSRM คืนมา" ซึ่งเป็นเส้นเดียวกับที่กำลังนำทาง หัวลูกศรจึงขนาน
-   * กับถนนเสมอ (ของเดิมวิ่งเป็นเส้นตรงระหว่างจุดสาธิต ลูกศรเลยเฉียงออกจากเส้นสีน้ำเงิน)
+   * เปิดแล้วจัดฉากสาธิตให้ครบชุด: วางอุบัติเหตุกับกลุ่มรถติดลงบนเส้นทางที่เร็วที่สุด
+   * แล้วเปิดแผ่นเปรียบเทียบเส้นทางให้เห็นว่ามีเส้นที่ปลอดภัยกว่าให้เลือก
+   * พอกดเริ่มนำทางถึงค่อยขับตามเส้นที่เลือก — ลูกศรจะขนานกับถนนเพราะขับบนเส้นทางจริง
    */
   async function toggleSimulationDrive() {
     if (window.Alerts.isSimulating) {
@@ -430,24 +520,23 @@ window.UI = (function () {
     }
 
     window.Alerts.ensureAudio();
-    toast('กำลังเตรียมเส้นทางสาธิต…');
+    toast('กำลังจัดฉากสาธิต…');
+
+    const trip = window.Alerts.SIM_TRIP;
 
     try {
-      const route = await window.Route.getRouteVia(window.Alerts.SIM_WAYPOINTS);
-      const path = route.coordinates;
-      const start = path[0];
-      const end = path[path.length - 1];
+      const routes = await window.Route.getRoutes(trip.from, trip.to);
+      window.Store.setDemoReports(buildDemoScenario(routes));
 
-      // วางตัวผู้ใช้ที่จุดเริ่มก่อน เพื่อให้การนำทางคิดจากตรงนั้น ไม่ใช่จากกลางจอ
-      window.Store.setUserPosition(start, U.bearing(start, path[1] || end), 0);
+      // วางตัวผู้ใช้ที่จุดเริ่ม เพื่อให้ทุกอย่างคิดจากตรงนั้น ไม่ใช่จากกลางจอ
+      const head = U.bearing(routes[0].coordinates[0], routes[0].coordinates[1] || trip.to);
+      window.Store.setUserPosition(routes[0].coordinates[0], head, 0);
+      setView('map');
 
-      await startNavigation(
-        { lng: end[0], lat: end[1], label: 'ปลายทางเส้นทางสาธิต' },
-        { vehicle: 'car', preRoute: route, skipOverview: true }
+      openTripSheet(
+        { name: trip.label, detail: 'ฉากสาธิต — มีอุบัติเหตุและรถติดอยู่บนเส้นทางที่เร็วที่สุด', lng: trip.to[0], lat: trip.to[1] },
+        { routes, simulate: true }
       );
-      // เริ่มขับหลังจากตั้งโหมดนำทางเสร็จ กล้องจะได้ไม่โดนแย่งระหว่างจัดมุมครั้งแรก
-      // (ไม่ต้อง toast ซ้ำ — การที่หน้าจอเปลี่ยนเป็นโหมดนำทางก็บอกอยู่แล้วว่าเริ่มแล้ว)
-      window.Alerts.startSimulation(path);
     } catch (_) {
       /*
        * ต่อ OSRM ไม่ได้ (ออฟไลน์/เซิร์ฟเวอร์ล่ม) — ยังให้ขับตามเส้นสาธิตแบบเดิมได้
@@ -1193,16 +1282,23 @@ window.UI = (function () {
   let tripRoutes = [];      // เส้นทางทั้งหมดที่ OSRM ให้มา (ตัวแรก = เร็วที่สุด)
   let tripPick = 0;         // ผู้ใช้เลือกเส้นไหนอยู่
   let tripVehicle = 'car';
+  let tripSimulate = false; // เปิดมาจากโหมดจำลอง = กดเริ่มแล้วให้ขับให้ดูเลย
 
   const tripRoute = () => tripRoutes[tripPick] || null;
 
-  async function openTripSheet(place) {
+  /**
+   * @param {object} [opts.routes] เส้นทางที่คำนวณมาแล้ว (ฉากสาธิตส่งมาเอง)
+   * @param {boolean} [opts.simulate] กดเริ่มนำทางแล้วให้เริ่มขับจำลองด้วย
+   */
+  async function openTripSheet(place, opts = {}) {
     tripPlace = place;
     tripRoutes = [];
     tripPick = 0;
+    tripSimulate = !!opts.simulate;
 
     $('#tripName').textContent = place.name;
     $('#tripDetail').textContent = place.detail || '';
+    $('#tripStart').textContent = tripSimulate ? 'เริ่มขับจำลอง' : 'เริ่มนำทาง';
     $('#tripStart').disabled = true;
     renderVehiclePicker();
     $('#tripBody').innerHTML = '<p class="place-note">กำลังคำนวณเส้นทางและประเมินความเสี่ยง…</p>';
@@ -1210,7 +1306,8 @@ window.UI = (function () {
 
     try {
       // ขอเส้นทางสำรองมาด้วย เพื่อเทียบว่ามีเส้นที่ปลอดภัยกว่าไหม
-      const routes = await window.Route.getRoutes(origin(), [place.lng, place.lat]);
+      const routes = opts.routes
+        || (await window.Route.getRoutes(origin(), [place.lng, place.lat]));
       if (tripPlace !== place) return; // ผู้ใช้เปลี่ยนจุดหมายระหว่างรอ
       tripRoutes = routes;
       $('#tripStart').disabled = false;
@@ -1221,9 +1318,15 @@ window.UI = (function () {
   }
 
   function closeTripSheet() {
+    // ปิดแผ่นฉากสาธิตทิ้งโดยไม่กดเริ่ม = ยกเลิกฉาก เก็บจุดสาธิตออกให้เรียบร้อย
+    if (tripSimulate) {
+      window.Store.clearDemoReports();
+      syncSettings();
+    }
     tripPlace = null;
     tripRoutes = [];
     tripPick = 0;
+    tripSimulate = false;
     closeOverlay('#tripSheet');
   }
 
@@ -1522,13 +1625,24 @@ window.UI = (function () {
     $('#tripSheet').addEventListener('click', (e) => {
       if (e.target.id === 'tripSheet') closeTripSheet();
     });
-    $('#tripStart').addEventListener('click', () => {
+    $('#tripStart').addEventListener('click', async () => {
       const preRoute = tripRoute();
       if (!tripPlace || !preRoute) return;
       const dest = { lng: tripPlace.lng, lat: tripPlace.lat, label: tripPlace.name };
       const vehicle = tripVehicle;
+      const simulate = tripSimulate;
+      // เคลียร์ก่อนปิด ไม่งั้น closeTripSheet จะไปลบจุดของฉากที่กำลังจะใช้ขับทิ้ง
+      tripSimulate = false;
       closeTripSheet();
-      startNavigation(dest, { vehicle, preRoute });
+
+      await startNavigation(dest, { vehicle, preRoute, skipOverview: simulate });
+
+      // ฉากสาธิต: ขับตามเส้นที่ผู้ใช้เพิ่งเลือก หัวลูกศรจึงขนานกับถนนเสมอ
+      if (simulate && window.Navigate.isActive) {
+        window.Alerts.startSimulation(preRoute.coordinates);
+        syncSettings();
+        syncStatusButtons();
+      }
     });
     // ปุ่มย้อนกลับในหน้ารายละเอียด — เลิกเลือกแล้วแผ่นจะกลับเป็นรายการเอง
     // และหุบกลับมาระดับแง้ม เพราะรายการไม่ต้องใช้ที่เยอะเท่าการ์ดรายละเอียด
