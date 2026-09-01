@@ -2103,14 +2103,29 @@ window.UI = (function () {
    */
   const clampScore = (n) => Math.min(95, Math.max(5, n));
 
-  function tripBlend(analysis) {
+  /**
+   * @param {Array<object>} [spots] จุดจากโมเดลบนเส้นนี้ ที่ผู้เรียกจับคู่ไว้แล้ว
+   *   ส่งมาเพื่อไม่ต้องจับคู่ซ้ำ — เป็นงานหนักสุดของการวาดแผ่นทริป
+   */
+  function tripBlend(analysis, spots) {
     const forecast = window.AIUI?.currentForecast?.() || null;
-    const spots = window.Hotspots.riskAlongRoute(analysis.route.coordinates).spots;
-    const withStats = statRouteScore(analysis.score, spots, analysis.distance);
+    const onRoute = spots
+      || window.Hotspots.riskAlongRoute(analysis.route.coordinates).spots;
+    const withStats = statRouteScore(analysis.score, onRoute, analysis.distance);
     const blended = window.AIForecast.blendRouteScore(withStats, forecast);
+
+    /*
+     * คะแนนสำหรับ "เทียบเส้นทาง" คิดจาก avoidScore ไม่ใช่ score
+     *
+     * avoidScore ตัดด่านตรวจออก (ดู RouteRisk.NOT_AVOIDABLE) เพราะเราไม่ช่วยให้
+     * คนเลี่ยงด่าน ส่วนพยากรณ์รายวันไม่ต้องใส่ เพราะมันเป็นค่าของทั้งจังหวัด
+     * ทุกเส้นจึงโดนเท่ากันและหักล้างกันไปเองตอนเทียบ
+     */
+    const compareScore = statRouteScore(analysis.avoidScore, onRoute, analysis.distance);
 
     if (!blended.adjusted && withStats === analysis.score) {
       return {
+        compareScore,
         score: clampScore(analysis.score),
         levelKey: analysis.level.key,
         levelLabel: analysis.level.label,
@@ -2124,6 +2139,7 @@ window.UI = (function () {
     // มีแต่จุดสถิติ ไม่มีผลจากพยากรณ์รายวัน — อธิบายเท่าที่มีจริง
     if (!blended.adjusted) {
       return {
+        compareScore,
         score: clampScore(blended.score),
         levelKey: level.key,
         levelLabel: level.label,
@@ -2141,6 +2157,7 @@ window.UI = (function () {
     const direction = blended.delta > 0 ? 'เพิ่ม' : 'ลด';
 
     return {
+      compareScore,
       score: clampScore(blended.score),
       levelKey: level.key,
       levelLabel: level.label,
@@ -2159,13 +2176,26 @@ window.UI = (function () {
   /** เวลา ระยะทาง ความเสี่ยงรวม และรายชื่อถนนเสี่ยงบนเส้นทางที่เลือก */
   function renderTripBody() {
     const all = tripRoutes.map((r) => window.RouteRisk.analyze(r, tripVehicle));
-    const verdict = window.RouteRisk.compare(all);
+
+    // จับคู่จุดจากโมเดลเส้นละครั้งเดียวต่อการวาดหนึ่งรอบ แล้วส่งต่อให้ทุกคนใช้
+    const spots = all.map((x) => window.Hotspots.riskAlongRoute(x.route.coordinates).spots);
+    const blends = all.map((x, i) => tripBlend(x, spots[i]));
+    const blendOf = new Map(all.map((x, i) => [x, blends[i]]));
+
+    /*
+     * เส้นที่ "ปลอดภัยกว่า" ต้องตัดสินด้วยคะแนนที่รวมจุดจากโมเดลแล้ว
+     *
+     * ค่าตั้งต้นของ compare() คือ avoidScore ซึ่งนับเฉพาะรายงานของผู้ใช้ เส้นทาง
+     * ที่ไม่มีใครแจ้งอะไรเลยจึงได้ 0 เท่ากันหมด แล้วแอปก็ไม่เคยเสนอให้เปลี่ยน
+     * เส้นทางเลยสักครั้ง ทั้งที่โมเดลเห็นว่าสองเส้นเสี่ยงต่างกันชัดเจน
+     */
+    const verdict = window.RouteRisk.compare(all, (x) => blendOf.get(x).compareScore);
     const a = all[tripPick];
 
     const eta = new Date(Date.now() + a.duration * 1000)
       .toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 
-    const blend = tripBlend(a);
+    const blend = blends[tripPick];
 
     const roads = a.roads.slice(0, 5).map((r) => `
       <li class="trip-road" style="--road-color:${r.level.color}">
@@ -2178,7 +2208,7 @@ window.UI = (function () {
       </li>`).join('');
 
     $('#tripBody').innerHTML = `
-      ${renderRouteChoices(all, verdict)}
+      ${renderRouteChoices(all, verdict, blends)}
 
       <div class="trip-stats">
         <div><span>เวลาเดินทาง</span><strong>${formatDuration(a.duration)}</strong></div>
@@ -2221,7 +2251,7 @@ window.UI = (function () {
    * ตั้งใจไม่สลับเส้นทางให้เองเงียบ ๆ แค่ชี้ให้เห็นว่ามีเส้นที่ปลอดภัยกว่า
    * แล้วให้ผู้ใช้ตัดสินใจ เพราะคะแนนความเสี่ยงของเรายังเป็นค่าประมาณ
    */
-  function renderRouteChoices(all, verdict) {
+  function renderRouteChoices(all, verdict, blends) {
     if (all.length < 2) return '';
 
     const fastest = all[0];
@@ -2234,7 +2264,7 @@ window.UI = (function () {
        * คะแนนจะกระโดดขึ้นทันทีทั้งที่เป็นเส้นเดิม — ผู้ใช้เลือกเส้นทางจากตัวเลข
        * ตรงนี้ ตัวเลขจึงต้องเป็นตัวเดียวกับที่ใช้ตัดสินใจทั้งแอป
        */
-      const blend = tripBlend(a);
+      const blend = blends[i];
       const slower = a.duration - fastest.duration;
       /*
        * ในฉากสาธิตป้ายบอก "เส้นนี้มีความเสี่ยงชนิดไหน" สำคัญกว่าบอกว่าเร็วหรือปลอดภัย

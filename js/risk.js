@@ -228,19 +228,22 @@ window.RouteRisk = (function () {
    * ด้วยตัวเลขที่ยังไม่ได้พิสูจน์นั้นหนักเกินกว่าที่ข้อมูลจะรองรับได้
    *
    * @param {Array<object>} analyses ผลจาก analyze() ของแต่ละเส้น (ตัวแรก = เร็วที่สุด)
+   * @param {function} [scoreOf] คะแนนที่ใช้ตัดสิน — ตั้งต้นคือ avoidScore ซึ่งนับ
+   *   เฉพาะรายงานของผู้ใช้ ผู้เรียกที่มีคะแนนรวมจุดจากโมเดลแล้วส่งของตัวเองเข้ามาได้
+   *   (ไฟล์นี้ไม่รู้จักชั้นข้อมูลจุดสถิติ จึงคิดคะแนนนั้นเองไม่ได้)
    * @returns {{fastest: object, safest: object, shouldSwitch: boolean, gain: number, extraSeconds: number}}
    */
-  function compare(analyses) {
+  function compare(analyses, scoreOf = (a) => a.avoidScore) {
     const fastest = analyses[0];
     let safest = fastest;
 
     for (const a of analyses) {
       const slower = (a.duration - fastest.duration) / Math.max(1, fastest.duration);
       if (slower > MAX_SLOWER) continue;                 // อ้อมไกลเกินไป
-      if (a.avoidScore < safest.avoidScore) safest = a;
+      if (scoreOf(a) < scoreOf(safest)) safest = a;
     }
 
-    const gain = fastest.avoidScore - safest.avoidScore;
+    const gain = scoreOf(fastest) - scoreOf(safest);
     return {
       fastest,
       safest,
