@@ -1676,13 +1676,11 @@ button:active { transform: scale(0.96); }
   place-items: center;
 }
 
-/* ชั้นในไว้ย่อ-ขยายตามระดับซูม โดยไม่ไปชนกับ transform ของ MapLibre */
+/* ชั้นในไว้จัดหัวลูกศรกับวงเรืองให้ซ้อนกึ่งกลาง โดยไม่ไปชนกับ transform ของ MapLibre */
 .user-puck__inner {
   position: relative;
   display: grid;
   place-items: center;
-  transform: scale(var(--puck-scale, 1));
-  transition: transform 0.2s ease;
 }
 
 /* หัวลูกศรชี้ทิศที่กำลังมุ่งหน้า */

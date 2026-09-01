@@ -586,10 +586,14 @@ window.MapView = (function () {
       node.style.setProperty('--marker-scale', scale.toFixed(2));
     }
 
-    // ลูกศรตำแหน่งผู้ใช้ต้องโตตามซูมด้วย ไม่งั้นซูมเข้าไปแล้วจะดูเล็กจนหาไม่เจอ
-    if (userMarker) {
-      userMarker.getElement().style.setProperty('--puck-scale', scale.toFixed(2));
-    }
+    /*
+     * หัวลูกศรตำแหน่งผู้ใช้ไม่โตตามซูม — คงขนาดเดียวตลอด
+     *
+     * ต่างจากหมุดภัยที่ต้องเล็กลงตอนซูมออกเพื่อไม่ให้ทับกันจนรก ลูกศรมีอยู่ดวงเดียว
+     * ไม่มีอะไรให้ทับ และมันคือจุดอ้างอิงที่สายตาต้องกลับมามองซ้ำ ๆ ระหว่างขับ
+     * ถ้าขนาดเปลี่ยนไปมาตามซูม (เช่นพอเริ่มนำทางแล้วกล้องซูมเข้า ลูกศรจะพองขึ้น
+     * ทันที) ผู้ใช้ต้องปรับสายตาใหม่ทุกครั้ง
+     */
   }
 
   function buildMarkerElement(report) {
@@ -730,7 +734,7 @@ window.MapView = (function () {
     if (!userMarker) {
       // หัวลูกศรชี้ไปตามทิศที่กำลังมุ่งหน้า พร้อมวงเรืองรอบ ๆ ให้หาเจอง่าย
       // ห้ามแตะ transform ของ .user-puck เพราะ MapLibre ใช้วางตำแหน่ง/หมุนตามทิศ
-      // การย่อ-ขยายตามซูมจึงทำที่ชั้นลูก (.user-puck__inner) แทน
+      // ถ้าต้องแต่งอะไรที่เป็น transform ให้ทำที่ชั้นลูก (.user-puck__inner) แทน
       const wrap = U.el('div', 'user-puck');
       wrap.innerHTML =
         '<div class="user-puck__inner">' +
