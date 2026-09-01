@@ -2063,12 +2063,28 @@ window.UI = (function () {
    * จะถูกตั้งก็ต่อเมื่อเริ่มนำทางแล้ว ตอนเปิดแผ่นทริปมันยังว่างอยู่ และตอนเทียบ
    * หลายเส้นมันก็เป็นชุดเดียวกันหมด ทำให้ทุกเส้นได้คะแนนจากโมเดลเท่ากัน
    */
-  function statRouteScore(baseScore, spots) {
+  function statRouteScore(baseScore, spots, distanceM) {
     if (!spots.length) return baseScore;
 
     const weight = spots.reduce((sum, h) => sum + Math.min(1, h.severity / 60), 0);
-    // เส้นโค้งอิ่มตัว: 1 จุดหนัก ≈ +23 แต้ม, 4 จุด ≈ +55 แต้ม, ไม่พุ่งชน 100 ง่าย ๆ
-    const add = 100 * (1 - Math.exp(-weight / 4));
+
+    /*
+     * คิดเป็น "ความหนาแน่นต่อ 10 กม." ไม่ใช่ยอดรวม — เกณฑ์เดียวกับที่ RouteRisk
+     * ใช้กับรายงานของผู้ใช้
+     *
+     * ถ้าใช้ยอดรวม เส้นทางยาว ๆ จะชนเพดานหมดเพราะสะสมจุดไปเรื่อย ๆ วัดจริง:
+     * สระบุรี→กทม 109 กม. ผ่าน 43 จุด, ชลบุรี→กทม 84 กม. ผ่าน 46 จุด และ
+     * กทม→หัวหิน 191 กม. ผ่าน 108 จุด — ทั้งหมดได้ 95% เท่ากันหมด เทียบอะไร
+     * ไม่ได้เลย ทั้งที่ต่อระยะทางเท่ากันมันเสี่ยงไม่เท่ากัน
+     *
+     * ตัวหาร 3 เลือกจากข้อมูลจริง: ทางหลวงระหว่างเมืองอยู่ราว 1.4-2.7 จุด/10 กม.
+     * ได้ 36-60% (ต้องระวัง-เสี่ยงสูง) ส่วนช่วงถนนที่จุดหนาแน่นจริงอย่างเส้นสาธิต
+     * 10.4 จุด/10 กม. ได้ 95% (ระวังให้มาก) และเส้นสองเส้นในทริปเดียวกัน
+     * ให้ตัวเลขต่างกันพอให้เลือกได้ เช่นชลบุรี→กทม 51% กับ 60%
+     */
+    const km = Math.max(0.3, (distanceM || 0) / 1000);
+    const density = (weight / km) * 10;
+    const add = 100 * (1 - Math.exp(-density / 3));
     const scored = Math.round(Math.min(100, baseScore + (100 - baseScore) * (add / 100)));
 
     /*
@@ -2090,7 +2106,7 @@ window.UI = (function () {
   function tripBlend(analysis) {
     const forecast = window.AIUI?.currentForecast?.() || null;
     const spots = window.Hotspots.riskAlongRoute(analysis.route.coordinates).spots;
-    const withStats = statRouteScore(analysis.score, spots);
+    const withStats = statRouteScore(analysis.score, spots, analysis.distance);
     const blended = window.AIForecast.blendRouteScore(withStats, forecast);
 
     if (!blended.adjusted && withStats === analysis.score) {
