@@ -598,6 +598,33 @@ window.UI = (function () {
     return cum.length - 1;
   }
 
+  /*
+   * ส่วนของเส้นทางนับจากระยะสะสมที่กำหนดไปจนจบ
+   *
+   * ใช้เป็น "เส้นที่รถจำลองวิ่ง" — เส้นทางที่นำทางยังเป็นเส้นเต็มเหมือนเดิม
+   * ระยะที่วิ่งมาแล้วจึงยังคิดถูก เพราะ Route.progress() ฉายตำแหน่งลงเส้นเต็ม
+   */
+  function pathFrom(route, meters) {
+    if (!(meters > 0)) return route.coordinates;
+    const i = indexAtAlong(route, meters);
+    return route.coordinates.length - i >= 2 ? route.coordinates.slice(i) : route.coordinates;
+  }
+
+  /*
+   * ระยะสะสมของ "สิ่งแรกที่ต้องเตือน" บนเส้นทางของฉากสาธิต
+   *
+   * มีสองแหล่ง เอาอันที่มาถึงก่อน: จุดที่โมเดลทำนายไว้บนเส้นนี้
+   * กับรายงานสาธิตใบแรก (ซึ่งวางไว้เฉพาะบนเส้นหลัก)
+   * คืน Infinity เมื่อเส้นนี้ไม่มีอะไรให้เตือนเลย
+   */
+  function firstWarningAlong(route) {
+    const spot = window.Hotspots.riskAlongRoute(route.coordinates).first;
+    return Math.min(
+      spot ? spot.along : Infinity,
+      tripPick === demoRouteIndex ? demoFirstReportAlong : Infinity,
+    );
+  }
+
   /** ชื่อถนนของช่วงที่ครอบจุดนี้อยู่ */
   function roadNameAt(route, index) {
     let name = '';
@@ -670,8 +697,11 @@ window.UI = (function () {
       { from: 'diverge', at: 2600, type: 'flood', severity: 'high', note: 'น้ำท่วมขังสูงราว 30 ซม. รถเล็กเลี่ยง', ageMin: 25, confirms: 11 },
     ];
 
+    const alongOf = (p) => (p.from === 'start' ? 0 : divergeAlong) + p.at;
+    demoFirstReportAlong = Math.min(...plan.map(alongOf));
+
     return plan.map((p) => {
-      const i = indexAtAlong(main, (p.from === 'start' ? 0 : divergeAlong) + p.at);
+      const i = indexAtAlong(main, alongOf(p));
       const [lng, lat] = main.coordinates[i];
       return {
         id: U.uid(),
@@ -710,7 +740,21 @@ window.UI = (function () {
     window.Alerts.ensureAudio();
     toast('กำลังจัดฉากสาธิต…');
 
-    const trip = window.Alerts.SIM_TRIP;
+    /*
+     * ต้นทาง-ปลายทางของฉากสาธิตมาจากข้อมูลของโมเดลเอง ไม่ใช่พิกัดที่จดไว้ตายตัว
+     *
+     * โหมดนี้มีไว้ทดสอบระบบเตือน ถ้าเส้นทางบังเอิญไม่ผ่านจุดที่โมเดลทำนายไว้เลย
+     * ก็ไม่มีอะไรให้เตือน แล้วก็ทดสอบอะไรไม่ได้ — จึงให้ Hotspots เลือกช่วงถนน
+     * ที่โมเดลชี้ว่าเสี่ยงที่สุดในย่านสาธิตมาเป็นเส้นทางตั้งแต่แรก
+     * (ข้อมูลจุดเสี่ยงยังโหลดไม่เสร็จก็ถอยไปใช้พิกัดที่จดไว้เหมือนเดิม)
+     */
+    const base = window.Alerts.SIM_TRIP;
+    const center = [
+      (base.from[0] + base.to[0]) / 2,
+      (base.from[1] + base.to[1]) / 2,
+    ];
+    const riskyTrip = window.Hotspots.riskiestTrip(center);
+    const trip = riskyTrip ? { ...base, from: riskyTrip.from, to: riskyTrip.to } : base;
 
     try {
       const routes = await window.Route.getRoutes(trip.from, trip.to);
@@ -719,15 +763,19 @@ window.UI = (function () {
        * ฉากสาธิตต้องโชว์ทั้งสองแหล่งความเสี่ยงในการขับรอบเดียว
        *
        * จุดจากโมเดลอยู่ที่ไหนเราเลือกไม่ได้ (มันคือสถิติจริง) แต่รายงานของผู้ใช้
-       * เราวางเองได้ จึงเลือกเส้นทางที่ผ่านจุดสถิติมากที่สุดก่อน แล้วค่อยวาง
+       * เราวางเองได้ จึงเลือกเส้นทางที่โมเดลชี้ว่าเสี่ยงที่สุดก่อน แล้วค่อยวาง
        * รายงานสาธิตลงบนเส้นเดียวกัน — ขับรอบเดียวจะเจอทั้งคำเตือนจากคนแจ้ง
        * และคำเตือนจากจุดที่โมเดลชี้
+       *
+       * เทียบด้วยน้ำหนักความรุนแรง ไม่ใช่จำนวนจุด — เส้นที่ผ่านจุดที่ตายทุกปี
+       * จุดเดียว เสี่ยงกว่าเส้นที่ผ่านจุดเล็ก ๆ หลายจุด และนั่นคือเส้นที่ควรเอามา
+       * ทดสอบการเตือน เพราะจะได้เห็นการเตือนระดับรุนแรงจริง ๆ
        */
-      const withCounts = routes.map((r, i) => ({
+      const scored = routes.map((r, i) => ({
         i,
-        n: window.Hotspots.countAlongRoute(r.coordinates),
+        ...window.Hotspots.riskAlongRoute(r.coordinates),
       }));
-      const ranked = [...withCounts].sort((a, b) => b.n - a.n);
+      const ranked = [...scored].sort((a, b) => b.weight - a.weight || b.count - a.count);
 
       /*
        * เส้นที่หนึ่ง = โดนทั้งสองแหล่ง (วางรายงานสาธิตลงไป)
@@ -736,10 +784,10 @@ window.UI = (function () {
        * มีไว้ให้เทียบกันตรง ๆ ว่าเส้นที่ "ไม่มีใครแจ้งอะไรเลย" ก็ยังมีความเสี่ยง
        * ที่โมเดลมองเห็นอยู่ ซึ่งเป็นประเด็นทั้งหมดของการมีโมเดล
        */
-      const best = ranked[0] || { i: 0, n: 0 };
-      const statOnly = ranked.find((r) => r.i !== best.i && r.n > 0) || null;
+      const best = ranked[0] || { i: 0, count: 0, weight: 0 };
+      const statOnly = ranked.find((r) => r.i !== best.i && r.count > 0) || null;
 
-      demoRouteIndex = best.n > 0 ? best.i : 0;
+      demoRouteIndex = best.count > 0 ? best.i : 0;
       demoStatOnlyIndex = statOnly ? statOnly.i : null;
 
       window.Store.setDemoReports(
@@ -755,8 +803,8 @@ window.UI = (function () {
         {
           name: trip.label,
           detail: demoStatOnlyIndex != null
-            ? `ฉากสาธิต — เทียบสองเส้น: เส้นหนึ่งมีทั้งรายงานและจุดจากโมเดล ${best.n} จุด อีกเส้นมีแต่จุดจากโมเดล ${statOnly.n} จุด`
-            : `ฉากสาธิต — เส้นนี้มีทั้งรายงานจากผู้ใช้และจุดเสี่ยงที่โมเดลชี้ ${best.n} จุด`,
+            ? `ฉากสาธิต — เทียบสองเส้น: เส้นหนึ่งมีทั้งรายงานและจุดจากโมเดล ${best.count} จุด อีกเส้นมีแต่จุดจากโมเดล ${statOnly.count} จุด`
+            : `ฉากสาธิต — เส้นนี้มีทั้งรายงานจากผู้ใช้และจุดเสี่ยงที่โมเดลชี้ ${best.count} จุด`,
           lng: trip.to[0],
           lat: trip.to[1],
         },
@@ -1919,6 +1967,8 @@ window.UI = (function () {
   let demoRouteIndex = 0;
   // เส้นที่ตั้งใจให้มีแต่จุดจากโมเดล ไม่มีรายงานของคนเลย (null = ไม่มีเส้นแบบนั้น)
   let demoStatOnlyIndex = null;
+  // ระยะสะสมของรายงานสาธิตใบแรกบนเส้นหลัก — ใช้เลือกจุดเริ่มขับ
+  let demoFirstReportAlong = Infinity;
   let tripVehicle = 'car';
   let tripSimulate = false; // เปิดมาจากโหมดจำลอง = กดเริ่มแล้วให้ขับให้ดูเลย
 
@@ -2392,17 +2442,20 @@ window.UI = (function () {
       const simulate = tripSimulate;
 
       /*
-       * เส้น "เฉพาะโมเดล" ไม่มีรายงานสาธิตวางไว้ให้เจอระหว่างทาง
-       * ถ้าเริ่มขับจากต้นทางจริงอาจต้องรอหลายนาทีกว่าจะถึงจุดแรก
-       * จึงเริ่มที่ราว 400 ม. ก่อนถึงจุดสถิติจุดแรก — คำเตือนจะขึ้นในไม่กี่วินาที
-       * (400 ม. ต่ำกว่าระยะเตือนล่วงหน้า 500 ม. เล็กน้อย)
+       * ขับจำลองให้เริ่มก่อนถึง "สิ่งแรกที่ต้องเตือน" ราว 400 ม. เสมอ
+       *
+       * เดิมทำเฉพาะเส้นที่มีแต่จุดจากโมเดล แต่เส้นอื่นก็มีปัญหาเดียวกัน คือถ้า
+       * เริ่มจากต้นทางจริงต้องรอหลายนาทีกว่าจะถึงจุดแรก ซึ่งไม่มีใครนั่งดูจนจบ
+       * จึงคิดจากทั้งสองแหล่ง แล้วเอาอันที่มาถึงก่อน: จุดที่โมเดลทำนายไว้บนเส้นนี้
+       * กับรายงานสาธิตใบแรก (มีเฉพาะบนเส้นหลัก)
+       * 400 ม. ต่ำกว่าระยะเตือนล่วงหน้า 500 ม. เล็กน้อย คำเตือนจึงขึ้นในไม่กี่วินาที
        */
-      const startAtRisk = simulate && tripPick === demoStatOnlyIndex;
-      const drivePath = startAtRisk
-        ? window.Hotspots.trimToFirstSpot(preRoute.coordinates)
+      const firstWarnAlong = simulate ? firstWarningAlong(preRoute) : Infinity;
+      const drivePath = Number.isFinite(firstWarnAlong)
+        ? pathFrom(preRoute, firstWarnAlong - 400)
         : preRoute.coordinates;
 
-      if (startAtRisk && drivePath !== preRoute.coordinates) {
+      if (drivePath !== preRoute.coordinates) {
         const head = U.bearing(drivePath[0], drivePath[1]);
         window.Store.setUserPosition(drivePath[0], head, 0);
       }

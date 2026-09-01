@@ -523,33 +523,96 @@ window.Hotspots = (function () {
     return out;
   }
 
-  /* จำนวนจุดสถิติที่เส้นทางหนึ่งวิ่งผ่าน — ใช้เทียบเส้นทางโดยไม่เปลี่ยนสถานะ */
-  function countAlongRoute(coordinates) {
-    return matchRoute(coordinates).length;
+  /*
+   * น้ำหนักความเสี่ยงของทั้งเส้นทางตามที่โมเดลชี้ — ไม่ใช่แค่ "กี่จุด"
+   *
+   * นับจำนวนอย่างเดียวทำให้เส้นที่ผ่านจุดเล็ก ๆ สิบจุด ดูเสี่ยงกว่าเส้นที่ผ่าน
+   * จุดที่ตายทุกปีจุดเดียว ซึ่งไม่ตรงกับความจริง จึงถ่วงด้วย severity_score
+   * (ตาย×10 + เจ็บ) ที่เป็นเกณฑ์เดียวกับที่ใช้แบ่งระดับสีบนแผนที่
+   */
+  function riskAlongRoute(coordinates) {
+    const spots = matchRoute(coordinates);
+    let weight = 0;
+    let worst = 0;
+    for (const s of spots) {
+      const h = data.hotspots[s.idx];
+      weight += h.severity;
+      if (h.severity > worst) worst = h.severity;
+    }
+    return { count: spots.length, weight, worst, first: spots[0] || null };
+  }
+
+  /* ---------- ต้นทาง-ปลายทางสาธิตที่สร้างจากข้อมูลของโมเดล ---------- */
+
+  /* ระยะจากจุดหนึ่งถึงเส้นตรง a→b (เมตร) — ฉายเป็นระนาบก่อน ระยะสั้นพอที่ความโค้งโลกไม่มีผล */
+  function distanceToSegment(p, a, b) {
+    const mPerDegLat = 111320;
+    const mPerDegLng = 111320 * Math.cos((a[1] * Math.PI) / 180);
+    const px = (p[0] - a[0]) * mPerDegLng;
+    const py = (p[1] - a[1]) * mPerDegLat;
+    const bx = (b[0] - a[0]) * mPerDegLng;
+    const by = (b[1] - a[1]) * mPerDegLat;
+    const len2 = bx * bx + by * by;
+    if (!len2) return Math.hypot(px, py);
+    const t = Math.max(0, Math.min(1, (px * bx + py * by) / len2));
+    return Math.hypot(px - bx * t, py - by * t);
   }
 
   /*
-   * ตัดเส้นทางให้เริ่มก่อนถึงจุดสถิติแรกไม่กี่ร้อยเมตร
+   * เลือกช่วงถนนที่โมเดลชี้ว่าเสี่ยงที่สุดในย่านหนึ่ง แล้วคืนเป็นทริปสาธิต
    *
-   * ใช้กับฉากสาธิต — ถ้าเริ่มขับจากต้นทางจริง กว่าจะถึงจุดแรกอาจกินเวลาหลายนาที
-   * ซึ่งไม่มีใครนั่งดูจนจบ ตัดให้เริ่มใกล้ ๆ แล้วคำเตือนจะโผล่ในไม่กี่วินาที
+   * มีไว้ให้โหมดจำลองการขับ "การันตี" ว่าจะได้วิ่งผ่านจุดที่โมเดลทำนายไว้จริง
+   * ถ้าใช้ต้นทาง-ปลายทางที่จดไว้ตายตัว วันไหน OSRM เลือกเส้นอื่นก็อาจไม่เจอ
+   * จุดเสี่ยงเลยสักจุด แล้วก็ทดสอบระบบเตือนไม่ได้
    *
-   * lead ตั้งต่ำกว่า RouteRisk.WARN_AHEAD_M (500 ม.) เล็กน้อย เพื่อให้การ์ดเตือน
-   * ขึ้นตั้งแต่วินาทีแรก ๆ ไม่ต้องรอให้ขับเข้าไปในระยะก่อน
+   * วิธีเลือก: เอาจุดที่รุนแรงที่สุดในย่านนั้นมาจับคู่กัน แล้ววัดว่าเส้นตรง
+   * ระหว่างคู่ไหน "ผ่าน" จุดเสี่ยงอื่นรวมน้ำหนักมากที่สุด — ถนนจริงไม่ตรงเป๊ะ
+   * แต่ใกล้พอให้ OSRM ลากเส้นทางผ่านกลุ่มจุดนั้น แล้วยืดหัวท้ายออกไปอีกฝั่งละ
+   * ประมาณหนึ่งกิโล เพื่อให้มีทางวิ่งเข้าและออกจากกลุ่ม ไม่ใช่เริ่มทับจุดแรกพอดี
    */
-  function trimToFirstSpot(coordinates, lead = 400) {
-    const spots = matchRoute(coordinates);
-    if (!spots.length) return coordinates;
+  function riskiestTrip(center, opts = {}) {
+    if (!data) return null;
 
-    const target = spots[0].at;
-    let back = 0;
-    let i = target;
-    while (i > 0 && back < lead) {
-      back += U.distance(coordinates[i - 1], coordinates[i]);
-      i--;
+    const areaM = opts.areaM || 45000;   // รัศมีย่านที่จะมองหา
+    const minM = opts.minM || 3000;      // สั้นกว่านี้ขับไม่ทันเห็นอะไร
+    const maxM = opts.maxM || 14000;     // ยาวกว่านี้เดโมนานเกินไป
+    const padM = opts.padM || 1200;      // ยืดหัวท้ายให้มีทางวิ่งเข้า-ออก
+
+    const local = [];
+    for (const h of data.hotspots) {
+      if (U.distance(center, [h.lon, h.lat]) <= areaM) local.push(h);
     }
-    // เหลือน้อยกว่าสองพิกัดจะคำนวณทิศทางไม่ได้ ถอยไปใช้เส้นเต็มแทน
-    return coordinates.length - i >= 2 ? coordinates.slice(i) : coordinates;
+    if (local.length < 2) return null;
+
+    const anchors = [...local].sort((a, b) => b.severity - a.severity).slice(0, 30);
+
+    let best = null;
+    for (let i = 0; i < anchors.length; i++) {
+      for (let j = i + 1; j < anchors.length; j++) {
+        const a = [anchors[i].lon, anchors[i].lat];
+        const b = [anchors[j].lon, anchors[j].lat];
+        const span = U.distance(a, b);
+        if (span < minM || span > maxM) continue;
+
+        let weight = 0;
+        let count = 0;
+        for (const h of local) {
+          if (distanceToSegment([h.lon, h.lat], a, b) > CORRIDOR_M * 2) continue;
+          weight += h.severity;
+          count++;
+        }
+        if (!best || weight > best.weight) best = { a, b, span, weight, count };
+      }
+    }
+    if (!best) return null;
+
+    const brg = U.bearing(best.a, best.b);
+    return {
+      from: U.destination(best.a, (brg + 180) % 360, padM),
+      to: U.destination(best.b, brg, padM),
+      count: best.count,
+      weight: best.weight,
+    };
   }
 
   function setRouteFilter(coordinates) {
@@ -692,8 +755,8 @@ window.Hotspots = (function () {
     routeHotspots,
     routeSpotsOrdered,
     upcomingOnRoute,
-    countAlongRoute,
-    trimToFirstSpot,
+    riskAlongRoute,
+    riskiestTrip,
     levelOf,
     classify,
     cleanCause,
