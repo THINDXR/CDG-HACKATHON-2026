@@ -2058,9 +2058,12 @@ window.UI = (function () {
    *
    * ถ่วงน้ำหนักด้วยความรุนแรง (ตาย×10 + เจ็บ) ไม่ใช่จำนวนจุด เพราะจุดที่
    * เกิดบ่อยแต่เจ็บเล็กน้อยไม่ควรดันคะแนนเท่าจุดที่ชนทีไรถึงตาย
+   *
+   * รับรายการจุดของ "เส้นนั้น" เข้ามา ไม่ไปอ่านตัวกรองส่วนกลางเอง เพราะตัวกรอง
+   * จะถูกตั้งก็ต่อเมื่อเริ่มนำทางแล้ว ตอนเปิดแผ่นทริปมันยังว่างอยู่ และตอนเทียบ
+   * หลายเส้นมันก็เป็นชุดเดียวกันหมด ทำให้ทุกเส้นได้คะแนนจากโมเดลเท่ากัน
    */
-  function statRouteScore(baseScore) {
-    const spots = window.Hotspots.routeHotspots();
+  function statRouteScore(baseScore, spots) {
     if (!spots.length) return baseScore;
 
     const weight = spots.reduce((sum, h) => sum + Math.min(1, h.severity / 60), 0);
@@ -2086,7 +2089,8 @@ window.UI = (function () {
 
   function tripBlend(analysis) {
     const forecast = window.AIUI?.currentForecast?.() || null;
-    const withStats = statRouteScore(analysis.score);
+    const spots = window.Hotspots.riskAlongRoute(analysis.route.coordinates).spots;
+    const withStats = statRouteScore(analysis.score, spots);
     const blended = window.AIForecast.blendRouteScore(withStats, forecast);
 
     if (!blended.adjusted && withStats === analysis.score) {
@@ -2103,7 +2107,6 @@ window.UI = (function () {
 
     // มีแต่จุดสถิติ ไม่มีผลจากพยากรณ์รายวัน — อธิบายเท่าที่มีจริง
     if (!blended.adjusted) {
-      const spots = window.Hotspots.routeHotspots();
       return {
         score: clampScore(blended.score),
         levelKey: level.key,
@@ -2207,6 +2210,15 @@ window.UI = (function () {
 
     const fastest = all[0];
     const rows = all.map((a, i) => {
+      /*
+       * ต้องเป็นคะแนนที่ผ่าน tripBlend() เหมือนการ์ดสรุปด้านล่าง
+       *
+       * ถ้าโชว์คะแนนดิบของ RouteRisk ตรง ๆ เส้นที่ไม่มีใครแจ้งอะไรเลยจะขึ้น 0%
+       * ทั้งที่ยังไม่ได้นับจุดที่โมเดลชี้กับพยากรณ์รายวันเข้าไป แล้วพอกดเริ่มนำทาง
+       * คะแนนจะกระโดดขึ้นทันทีทั้งที่เป็นเส้นเดิม — ผู้ใช้เลือกเส้นทางจากตัวเลข
+       * ตรงนี้ ตัวเลขจึงต้องเป็นตัวเดียวกับที่ใช้ตัดสินใจทั้งแอป
+       */
+      const blend = tripBlend(a);
       const slower = a.duration - fastest.duration;
       /*
        * ในฉากสาธิตป้ายบอก "เส้นนี้มีความเสี่ยงชนิดไหน" สำคัญกว่าบอกว่าเร็วหรือปลอดภัย
@@ -2225,7 +2237,7 @@ window.UI = (function () {
 
       return `
         <button type="button" class="route-opt${i === tripPick ? ' is-active' : ''}"
-                data-route="${i}" style="--opt-color:${a.level.color}">
+                data-route="${i}" style="--opt-color:${blend.color}">
           <span class="route-opt__main">
             <strong>${formatDuration(a.duration)}</strong>
             <small>${U.formatDistance(a.distance)}${
@@ -2233,7 +2245,7 @@ window.UI = (function () {
             }</small>
           </span>
           ${badge}
-          <span class="route-opt__score">${a.score}<small>%</small></span>
+          <span class="route-opt__score">${blend.score}<small>%</small></span>
         </button>`;
     }).join('');
 

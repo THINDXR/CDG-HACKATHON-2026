@@ -531,15 +531,18 @@ window.Hotspots = (function () {
    * (ตาย×10 + เจ็บ) ที่เป็นเกณฑ์เดียวกับที่ใช้แบ่งระดับสีบนแผนที่
    */
   function riskAlongRoute(coordinates) {
-    const spots = matchRoute(coordinates);
+    const hits = matchRoute(coordinates);
+    const spots = [];
     let weight = 0;
     let worst = 0;
-    for (const s of spots) {
+    for (const s of hits) {
       const h = data.hotspots[s.idx];
+      spots.push(h);
       weight += h.severity;
       if (h.severity > worst) worst = h.severity;
     }
-    return { count: spots.length, weight, worst, first: spots[0] || null };
+    // คืนตัวจุดมาด้วย เพราะผู้เรียกที่คิดคะแนนต้องถ่วงน้ำหนักรายจุดเอง
+    return { count: hits.length, weight, worst, spots, first: hits[0] || null };
   }
 
   /* ---------- ต้นทาง-ปลายทางสาธิตที่สร้างจากข้อมูลของโมเดล ---------- */
@@ -638,20 +641,12 @@ window.Hotspots = (function () {
     return routeIndexes === null ? 0 : routeIndexes.size;
   }
 
-  /* รายการจุดสถิติบนเส้นทาง เรียงตามความรุนแรง — ใช้กับคะแนนและการเตือน */
-  function routeHotspots() {
-    if (routeIndexes === null || !data) return [];
-    return [...routeIndexes]
-      .map((i) => data.hotspots[i])
-      .sort((a, b) => b.severity - a.severity);
-  }
-
   /*
    * จุดสถิติบนเส้นทาง เรียงตามลำดับที่จะวิ่งผ่าน พร้อมระยะ along
    *
-   * ต่างจาก routeHotspots() ที่เรียงตามความรุนแรงเพื่อเอาไปคิดคะแนน — อันนี้
-   * เรียงตามเส้นทาง เพราะคนขับอ่านรายการเป็นลำดับ "จุดถัดไปคืออะไร"
-   * ไม่ใช่ "จุดไหนหนักสุด"
+   * ต่างจาก riskAlongRoute() ที่รับพิกัดเส้นไหนก็ได้มาคิดคะแนน — อันนี้อ่านจาก
+   * ตัวกรองของเส้นทางที่กำลังนำทางอยู่ และเรียงตามเส้นทาง เพราะคนขับอ่านรายการ
+   * เป็นลำดับ "จุดถัดไปคืออะไร" ไม่ใช่ "จุดไหนหนักสุด"
    */
   function routeSpotsOrdered() {
     if (!data) return [];
@@ -752,7 +747,6 @@ window.Hotspots = (function () {
     near,
     setRouteFilter,
     routeCount,
-    routeHotspots,
     routeSpotsOrdered,
     upcomingOnRoute,
     riskAlongRoute,
