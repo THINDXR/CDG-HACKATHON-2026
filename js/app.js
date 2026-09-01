@@ -8,6 +8,15 @@
   const LIST_RENDER_MS = 2000;
 
   function boot() {
+    /*
+     * บอกรุ่นของโค้ดที่กำลังรันอยู่ก่อนเป็นอย่างแรก
+     *
+     * ไม่มีขั้นตอน build เบราว์เซอร์กับ CDN ของ GitHub Pages จึงถือไฟล์เดิมไว้ได้
+     * นาน ทดสอบแล้วเห็นพฤติกรรมของรุ่นก่อนโดยไม่รู้ตัว บรรทัดนี้ทำให้เช็คได้ทันที
+     * ว่าที่เห็นอยู่คือรุ่นไหน — เทียบกับ BUILD ใน js/config.js
+     */
+    console.info(`ยืดอกโหลดแอป · build ${window.APP_CONFIG.BUILD}`);
+
     // เติมไอคอน SVG ให้ element ที่ประกาศ data-icon ไว้ในหน้า HTML
     window.Icons.paint();
 

@@ -19,7 +19,7 @@
         href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Noto+Sans+Thai:wght@400;500;700;900&display=swap" />
 
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css" />
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=2026-09-02a" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚠️</text></svg>" />
 </head>
 <body>
@@ -404,24 +404,32 @@
   </nav>
 </div>
 
+  <!--
+    ?v= ท้ายไฟล์ในเครื่องคือตัวกันแคช — ต้องขยับทุกครั้งที่แก้ js/ หรือ css/
+    พร้อมกับ BUILD ใน js/config.js ให้เป็นค่าเดียวกัน
+
+    ไม่มีขั้นตอน build ในโปรเจกต์นี้ เบราว์เซอร์กับ CDN ของ GitHub Pages จึงถือ
+    ไฟล์เดิมไว้ได้เป็นสิบนาที ทำให้ทดสอบแล้วเห็นพฤติกรรมของโค้ดรุ่นก่อน
+    แล้วเข้าใจผิดว่าแก้ไม่ขึ้น
+  -->
   <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
-  <script src="js/icons.js"></script>
-  <script src="js/config.js"></script>
-  <script src="js/utils.js"></script>
-  <script src="js/geocode.js"></script>
-  <script src="js/route.js"></script>
-  <script src="js/store.js"></script>
-  <script src="js/risk.js"></script>
-  <script src="js/hotspots.js"></script>
-  <script src="js/ai-model.js"></script>
-  <script src="js/ai-holidays.js"></script>
-  <script src="js/ai-forecast.js"></script>
-  <script src="js/ai-ui.js"></script>
-  <script src="js/impact.js"></script>
-  <script src="js/map.js"></script>
-  <script src="js/alerts.js"></script>
-  <script src="js/navigate.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/icons.js?v=2026-09-02a"></script>
+  <script src="js/config.js?v=2026-09-02a"></script>
+  <script src="js/utils.js?v=2026-09-02a"></script>
+  <script src="js/geocode.js?v=2026-09-02a"></script>
+  <script src="js/route.js?v=2026-09-02a"></script>
+  <script src="js/store.js?v=2026-09-02a"></script>
+  <script src="js/risk.js?v=2026-09-02a"></script>
+  <script src="js/hotspots.js?v=2026-09-02a"></script>
+  <script src="js/ai-model.js?v=2026-09-02a"></script>
+  <script src="js/ai-holidays.js?v=2026-09-02a"></script>
+  <script src="js/ai-forecast.js?v=2026-09-02a"></script>
+  <script src="js/ai-ui.js?v=2026-09-02a"></script>
+  <script src="js/impact.js?v=2026-09-02a"></script>
+  <script src="js/map.js?v=2026-09-02a"></script>
+  <script src="js/alerts.js?v=2026-09-02a"></script>
+  <script src="js/navigate.js?v=2026-09-02a"></script>
+  <script src="js/ui.js?v=2026-09-02a"></script>
+  <script src="js/app.js?v=2026-09-02a"></script>
 </body>
 </html>
