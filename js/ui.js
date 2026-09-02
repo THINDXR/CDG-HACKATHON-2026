@@ -2064,7 +2064,15 @@ window.UI = (function () {
    * หลายเส้นมันก็เป็นชุดเดียวกันหมด ทำให้ทุกเส้นได้คะแนนจากโมเดลเท่ากัน
    */
   function statRouteScore(baseScore, spots, distanceM) {
-    if (!spots.length) return baseScore;
+    /*
+     * เช็ค spots ว่ามีจริงไหมก่อน ไม่ใช่แค่ว่าว่างหรือเปล่า
+     *
+     * โปรเจกต์นี้ไม่มีขั้นตอน build ไฟล์ js แต่ละไฟล์จึงถูกแคชแยกกัน และหมดอายุ
+     * ไม่พร้อมกัน เบราว์เซอร์จึงถือ ui.js รุ่นใหม่คู่กับ hotspots.js รุ่นเก่าได้
+     * ซึ่งรุ่นเก่ายังไม่คืนฟิลด์ spots มาด้วย พอมาถึงบรรทัดนี้ก็ระเบิดกลางทาง
+     * ทั้งที่แค่ควรคิดคะแนนโดยไม่มีจุดจากโมเดลไปก่อน
+     */
+    if (!spots?.length) return baseScore;
 
     const weight = spots.reduce((sum, h) => sum + Math.min(1, h.severity / 60), 0);
 
@@ -2110,7 +2118,8 @@ window.UI = (function () {
   function tripBlend(analysis, spots) {
     const forecast = window.AIUI?.currentForecast?.() || null;
     const onRoute = spots
-      || window.Hotspots.riskAlongRoute(analysis.route.coordinates).spots;
+      || window.Hotspots.riskAlongRoute(analysis.route.coordinates)?.spots
+      || [];
     const withStats = statRouteScore(analysis.score, onRoute, analysis.distance);
     const blended = window.AIForecast.blendRouteScore(withStats, forecast);
 
