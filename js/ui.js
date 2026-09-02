@@ -2112,15 +2112,19 @@ window.UI = (function () {
   const clampScore = (n) => Math.min(95, Math.max(5, n));
 
   /**
-   * @param {Array<object>} [spots] จุดจากโมเดลบนเส้นนี้ ที่ผู้เรียกจับคู่ไว้แล้ว
+   * @param {Array<object>} [preMatched] จุดจากโมเดลบนเส้นนี้ ที่ผู้เรียกจับคู่ไว้แล้ว
    *   ส่งมาเพื่อไม่ต้องจับคู่ซ้ำ — เป็นงานหนักสุดของการวาดแผ่นทริป
+   *
+   * ตั้งชื่อไม่ให้ซ้ำกับ spots ข้างล่างโดยตั้งใจ ถ้าใช้ชื่อเดียวกัน พารามิเตอร์จะไป
+   * บังตัวที่แก้ค่าว่างแล้ว แล้วโค้ดที่อ้าง spots ตรงไหนก็ตามจะได้ undefined
+   * เวลาผู้เรียกไม่ส่งอะไรมา — ซึ่งเคยทำให้การนำทางล้มมาแล้ว
    */
-  function tripBlend(analysis, spots) {
+  function tripBlend(analysis, preMatched) {
     const forecast = window.AIUI?.currentForecast?.() || null;
-    const onRoute = spots
+    const spots = preMatched
       || window.Hotspots.riskAlongRoute(analysis.route.coordinates)?.spots
       || [];
-    const withStats = statRouteScore(analysis.score, onRoute, analysis.distance);
+    const withStats = statRouteScore(analysis.score, spots, analysis.distance);
     const blended = window.AIForecast.blendRouteScore(withStats, forecast);
 
     /*
@@ -2130,7 +2134,7 @@ window.UI = (function () {
      * คนเลี่ยงด่าน ส่วนพยากรณ์รายวันไม่ต้องใส่ เพราะมันเป็นค่าของทั้งจังหวัด
      * ทุกเส้นจึงโดนเท่ากันและหักล้างกันไปเองตอนเทียบ
      */
-    const compareScore = statRouteScore(analysis.avoidScore, onRoute, analysis.distance);
+    const compareScore = statRouteScore(analysis.avoidScore, spots, analysis.distance);
 
     if (!blended.adjusted && withStats === analysis.score) {
       return {
