@@ -31,14 +31,9 @@
      */
     window.AIUI.updateFor(forecastOrigin());
 
-    window.MapView.onMarkerClick = (id) => {
-      window.Store.select(id);
-      // กดหมุดบนแผนที่ก็ให้แผ่นเปิดมาแสดงรายละเอียดเช่นเดียวกับกดจากรายการ
-      // ต้องกางแผ่นก่อนบิน กล้องจะได้เล็งหมุดไว้เหนือแผ่น ไม่ใช่ไปอยู่หลังมัน
-      window.UI.showDetailSheet();
-      const r = window.Store.state.reports.find((x) => x.id === id);
-      if (r) window.MapView.flyToReport(r, { zoom: Math.max(window.MapView.instance.getZoom(), 16.5) });
-    };
+    // กดหมุดบนแผนที่ก็ให้แผ่นเปิดมาแสดงรายละเอียดเช่นเดียวกับกดจากรายการ
+    // (ระหว่างนำทางจะไปขึ้นแผ่นจุดเสี่ยงแทน เพราะแผ่นความปลอดภัยถูกจางทิ้งไปแล้ว)
+    window.MapView.onMarkerClick = (id) => window.UI.openReportDetail(id);
 
     window.MapView.onReady(() => {
       window.MapView.refreshHazards();

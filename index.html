@@ -63,14 +63,20 @@
       <strong id="navSpeed">0</strong>
       <span>km/h</span>
     </div>
-    <div class="nav-status__safety" id="navSafety">
+    <!--
+      เป็นปุ่มไม่ใช่ป้าย เพราะตัวเลขคะแนนอย่างเดียวตอบได้แค่ "เสี่ยงแค่ไหน"
+      แต่คนขับอยากรู้ต่อว่า "เสี่ยงตรงไหน" — แตะแล้วกางรายการจุดเสี่ยงข้างหน้า
+    -->
+    <button class="nav-status__safety" id="navSafety" type="button"
+            aria-label="ดูจุดเสี่ยงบนเส้นทาง">
       <span class="nav-status__shield" data-icon="shield" aria-hidden="true"></span>
       <span class="nav-status__text">
         <strong id="navSafetyLabel">กำลังประเมิน</strong>
         <small id="navSafetyDetail">เส้นทางนี้</small>
       </span>
       <span class="nav-status__score" id="navSafetyScore"></span>
-    </div>
+      <span class="nav-status__more" data-icon="chevronRight" aria-hidden="true"></span>
+    </button>
   </div>
 
   <!-- เตือนเมื่อเข้าใกล้จุดเสี่ยงที่อยู่บนเส้นทางข้างหน้า -->
@@ -176,6 +182,27 @@
       <footer class="sheet__foot">
         <button type="button" class="ghost-btn" id="tripCancel">ปิด</button>
         <button type="button" class="primary-btn" id="tripStart">เริ่มนำทาง</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ===== จุดเสี่ยงบนเส้นทาง (เปิดจากป้ายความปลอดภัยระหว่างนำทาง) ===== -->
+  <div id="riskSheet" class="sheet-backdrop" hidden>
+    <div class="sheet glass">
+      <div class="sheet__handle" aria-hidden="true"></div>
+      <header class="sheet__head">
+        <div class="trip__dest">
+          <span class="trip__eyebrow">ความเสี่ยงบนเส้นทาง</span>
+          <h2 id="riskName">—</h2>
+          <p id="riskDetail" class="sheet__sub"></p>
+        </div>
+        <button type="button" class="icon-btn" id="riskClose" aria-label="ปิด" data-icon="close"></button>
+      </header>
+
+      <div id="riskBody" class="trip__body" aria-live="polite"></div>
+
+      <footer class="sheet__foot">
+        <button type="button" class="primary-btn" id="riskDone">กลับไปนำทาง</button>
       </footer>
     </div>
   </div>

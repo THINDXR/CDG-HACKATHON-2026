@@ -1810,7 +1810,25 @@ body.picking .phone > #map::after {
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   box-shadow: var(--shadow-sm);
 }
+/* เป็น <button> แล้ว จึงต้องล้างสไตล์ปุ่มของเบราว์เซอร์ให้กลับมาเหมือนป้ายเดิม */
+.nav-status__safety {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-status__safety:active { transform: scale(0.985); }
 .nav-status__shield { flex: none; font-size: 21px; color: var(--safety-color); display: grid; place-items: center; }
+/* ลูกศรบอกว่าป้ายนี้แตะได้ ไม่ใช่แค่ตัวเลขที่โชว์เฉย ๆ */
+.nav-status__more {
+  flex: none;
+  font-size: 15px;
+  color: var(--safety-color);
+  opacity: 0.65;
+  display: grid;
+  place-items: center;
+}
 .nav-status__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .nav-status__text strong {
   font-size: 14px;
@@ -2168,6 +2186,105 @@ body.picking .phone > #map::after {
   font-variant-numeric: tabular-nums;
 }
 .trip-road__score small { font-size: 10px; font-weight: 700; opacity: 0.7; }
+
+/*
+ * รายการจุดเสี่ยงบนเส้นทาง (แผ่นที่เปิดจากป้ายความปลอดภัยตอนนำทาง)
+ *
+ * เรียงตามลำดับที่จะวิ่งผ่าน แถวจึงต้องอ่านจากบนลงล่างได้เหมือนไทม์ไลน์
+ * ระยะอยู่ขวาสุดเพราะเป็นคอลัมน์ที่ตากวาดหาเร็วที่สุดเวลาถามว่า "อีกไกลไหม"
+ */
+.risk-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.risk-item {
+  --item-color: var(--warn);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.2s ease;
+}
+.risk-item:active { background: color-mix(in srgb, var(--item-color) 12%, var(--surface)); }
+
+.risk-item__icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+  border-radius: 11px;
+  color: var(--item-color);
+  background: color-mix(in srgb, var(--item-color) 16%, transparent);
+}
+.risk-item__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.risk-item__text strong {
+  font-size: 13.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.risk-item__text small {
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/*
+ * ป้ายที่มา — "รายงาน" (มีคนแจ้งตอนนี้) กับ "สถิติ" (เคยเกิดซ้ำ ๆ มาหลายปี)
+ * เป็นข้อมูลคนละน้ำหนักในการตัดสินใจ รวมอยู่ในรายการเดียวกันได้ก็ต่อเมื่อ
+ * แต่ละแถวบอกได้ว่าตัวเองมาจากไหน
+ */
+.risk-item__tag {
+  flex: none;
+  font-size: 9.5px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 1.5px 6px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.risk-item__dist {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--item-color);
+  font-variant-numeric: tabular-nums;
+}
+/* จุดที่ขับผ่านไปแล้ว ยังอยู่ในรายการเพื่อไม่ให้แถวเลื่อนตอนกำลังอ่าน แต่จางลง */
+.risk-item.is-passed { opacity: 0.42; }
+.risk-item.is-passed .risk-item__dist { color: var(--text-dim); font-weight: 700; }
+/* จุดที่กำลังผ่านพอดี — ตีกรอบสีให้เห็นว่าอันนี้คือ "ตรงนี้" */
+.risk-item.is-here {
+  border-color: color-mix(in srgb, var(--item-color) 60%, transparent);
+  background: color-mix(in srgb, var(--item-color) 12%, var(--surface));
+}
+
+.risk-passed {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* ทางกลับจาก "จุดที่กดมา" ไปยัง "ทั้งเส้นทาง" — สองมุมมองของแผ่นใบเดียวกัน */
+.risk-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 14px;
+  font-size: 12.5px;
+}
+.risk-back svg { width: 15px; height: 15px; }
 
 .trip-note {
   margin: 14px 0 0;

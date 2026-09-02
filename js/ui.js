@@ -457,18 +457,14 @@ window.UI = (function () {
       </div>`;
   }
 
-  function showHotspot(h) {
+  /*
+   * การ์ดจุดสถิติ แยกออกมาเป็นข้อความล้วนเพราะมีสองที่ที่ต้องวาดมัน
+   * — แผ่นความปลอดภัยตอนจอด และแผ่นจุดเสี่ยงตอนกำลังนำทาง (แผ่นซ้อนคนละใบ)
+   */
+  function hotspotCardHtml(h) {
     const level = window.Hotspots.levelOf(h.severity);
     const cat = window.Hotspots.classify(h);
-    const card = $('#sheetDetail');
-    const sheet = $('#sidebar');
-
-    // ยกเลิกการเลือกหมุดรายงาน ไม่งั้น renderDetail() จะมาวาดทับการ์ดนี้
-    window.Store.select(null);
-
-    sheet.classList.add('is-detail');
-    card.style.setProperty('--card-color', level.color);
-    card.innerHTML = `
+    return `
       <div class="hotspot-card">
         <div class="hotspot-card__head">
           <span class="hotspot-card__badge">สถิติจริง</span>
@@ -507,6 +503,28 @@ window.UI = (function () {
           ไม่ใช่เหตุที่กำลังเกิดอยู่ตอนนี้ · เกิดล่าสุด ${escapeHtml(h.latest)}
         </p>
       </div>`;
+  }
+
+  function showHotspot(h) {
+    /*
+     * ระหว่างนำทาง แผ่นความปลอดภัยถูกจางทิ้งไปแล้ว (.is-navigating .sidebar)
+     * ถ้าวาดการ์ดลงไปตรงนั้น ผู้ใช้กดหมุดแล้วจะไม่เห็นอะไรเลย
+     * จึงส่งไปขึ้นบนแผ่นจุดเสี่ยงซึ่งลอยอยู่เหนือจอนำทางแทน
+     */
+    if (window.Navigate.isActive) {
+      openRiskFocus({ kind: 'hotspot', h });
+      return;
+    }
+
+    const level = window.Hotspots.levelOf(h.severity);
+    const card = $('#sheetDetail');
+
+    // ยกเลิกการเลือกหมุดรายงาน ไม่งั้น renderDetail() จะมาวาดทับการ์ดนี้
+    window.Store.select(null);
+
+    $('#sidebar').classList.add('is-detail');
+    card.style.setProperty('--card-color', level.color);
+    card.innerHTML = hotspotCardHtml(h);
 
     collapseToMap();
     window.MapView.instance.flyTo({ center: [h.lon, h.lat], zoom: 15.5, duration: 900 });
@@ -565,6 +583,7 @@ window.UI = (function () {
     $('#phone').classList.remove('is-navigating');
     window.MapView.setNavRoute(null);
     showNavHazard(null);
+    closeRiskSheet();
     renderNav();
     setDetent('peek');
     syncSettings();
@@ -788,6 +807,9 @@ window.UI = (function () {
     // ยังไม่มีค่าความเร็ว (ยังไม่เปิด GPS / จอดนิ่ง) แสดงขีดแทนเลข 0 ที่ชวนเข้าใจผิด
     $('#navSpeed').textContent = speed == null ? '—' : Math.round(speed * 3.6);
 
+    // แผ่นจุดเสี่ยงถ้าเปิดค้างไว้ ต้องนับระยะถอยลงตามที่วิ่งไปด้วย ไม่ใช่ค้างค่าเดิม
+    syncRiskSheet();
+
     const a = window.Navigate.analysis;
     const safety = $('#navSafety');
     if (!a) {
@@ -895,6 +917,358 @@ window.UI = (function () {
         ${near ? '<b class="is-here">ตรงนี้</b>' : `<b>${num}</b><i>${unit}</i>`}
       </span>
       <span class="nav-hazard__meter"><i style="width:${closeness}%"></i></span>`;
+  }
+
+  /* ---------- แผ่นจุดเสี่ยงบนเส้นทาง (แตะป้ายความปลอดภัยระหว่างนำทาง) ---------- */
+
+  /*
+   * ป้ายบนจอบอกได้แค่ "เส้นทางนี้เสี่ยง 48%" ซึ่งตอบไม่ได้ว่าเสี่ยงตรงไหน
+   *
+   * ข้อมูลนั้นมีอยู่แล้วครบ (RouteRisk จับคู่รายงานเข้ากับเส้นทาง และ Hotspots
+   * จับคู่จุดสถิติ) แต่เดิมถูกใช้เฉพาะตอนเตือนทีละจุดตอนใกล้ถึงเท่านั้น
+   * แผ่นนี้กางของชุดเดียวกันออกมาให้ดูทั้งเส้นทางเมื่อผู้ใช้อยากรู้เอง
+   *
+   * ตั้งใจให้เป็น "แตะแล้วดู" ไม่ใช่แสดงค้างไว้ เพราะเป็นข้อมูลสำหรับจังหวะที่
+   * ผู้ใช้ตัดสินใจจะดู (ติดไฟแดง / ผู้โดยสารเปิดให้) ไม่ใช่ระหว่างมองถนน
+   */
+
+  // เลยจุดไปแล้วเกินเท่านี้ถึงนับว่า "ผ่านแล้ว" — ค่าเดียวกับที่ใช้ตอนเตือน
+  // เพราะ GPS คลาดเคลื่อนได้ ถ้าตัดที่ 0 พอดี จุดจะเปลี่ยนสถานะตอนขับผ่านพอดี
+  const PASSED_M = -60;
+
+  let riskOpen = false;
+  let riskMode = 'route';    // 'route' = ทั้งเส้นทาง · 'focus' = จุดเดียวที่กดมา
+  let riskFocus = null;      // จุดที่กำลังดูอยู่ในโหมด focus
+  let riskDrawnFor = null;   // analysis ที่วาดรายการไว้แล้ว
+  let riskPoints = [];       // พิกัดของแต่ละแถว เอาไว้พาแผนที่ไปดู
+
+  function openRiskSheet() {
+    if (!window.Navigate.isActive) return;
+    riskOpen = true;
+    riskMode = 'route';
+    riskFocus = null;
+    riskDrawnFor = null;
+    $('#riskName').textContent = window.Navigate.destination?.label || 'เส้นทางนี้';
+    syncRiskSheet();
+    openOverlay('#riskSheet');
+  }
+
+  /*
+   * กดหมุดบนแผนที่ระหว่างนำทาง = อยากรู้เรื่องจุดนั้นจุดเดียว
+   *
+   * ใช้แผ่นใบเดียวกับรายการทั้งเส้นทาง เพราะทั้งสองอย่างตอบคำถามเดียวกัน
+   * ("ข้างหน้ามีอะไร") คนละความละเอียด การมีแผ่นซ้อนสองใบระหว่างขับ
+   * แปลว่าผู้ใช้ต้องจำว่าตัวเองเปิดอันไหนค้างไว้ ซึ่งไม่ควรต้องคิดตอนขับ
+   *
+   * @param {object} focus {kind:'hotspot', h} หรือ {kind:'report', report}
+   */
+  function openRiskFocus(focus) {
+    if (!window.Navigate.isActive) return;
+    riskOpen = true;
+    riskMode = 'focus';
+    riskFocus = focus;
+    riskDrawnFor = null;
+    renderRiskFocus();
+    openOverlay('#riskSheet');
+  }
+
+  /** กดหมุดรายงาน — ระหว่างนำทางไปขึ้นแผ่นจุดเสี่ยง นอกนั้นใช้แผ่นความปลอดภัยเดิม */
+  function openReportDetail(id) {
+    const report = window.Store.state.reports.find((r) => r.id === id);
+
+    if (window.Navigate.isActive && report) {
+      openRiskFocus({ kind: 'report', report });
+      return;
+    }
+
+    window.Store.select(id);
+    // ต้องกางแผ่นก่อนบิน กล้องจะได้เล็งหมุดไว้เหนือแผ่น ไม่ใช่ไปอยู่หลังมัน
+    collapseToMap();
+    if (report) {
+      window.MapView.flyToReport(report, {
+        zoom: Math.max(window.MapView.instance.getZoom(), 16.5),
+      });
+    }
+  }
+
+  function closeRiskSheet() {
+    if (!riskOpen) return;
+    riskOpen = false;
+    riskMode = 'route';
+    riskFocus = null;
+    riskDrawnFor = null;
+    riskPoints = [];
+    closeOverlay('#riskSheet');
+  }
+
+  /*
+   * วาดใหม่ทั้งแผ่นเฉพาะตอนเส้นทางเปลี่ยน นอกนั้นขยับแค่ตัวเลขระยะ
+   *
+   * ตัวนี้ถูกเรียกทุกครั้งที่ GPS ขยับ ถ้าเขียน innerHTML ใหม่ทุกรอบ รายการจะ
+   * กระพริบและเด้งกลับไปบนสุดขณะที่ผู้ใช้กำลังไถอ่านอยู่
+   */
+  function syncRiskSheet() {
+    if (!riskOpen) return;
+
+    const a = window.Navigate.analysis;
+    if (!a) {
+      $('#riskBody').innerHTML = '<p class="place-note">กำลังประเมินเส้นทาง…</p>';
+      riskDrawnFor = null;
+      return;
+    }
+    if (riskMode === 'focus') {
+      updateFocusDistance();
+      return;
+    }
+    if (a !== riskDrawnFor) {
+      riskDrawnFor = a;
+      renderRiskSheet(a);
+    }
+    updateRiskDistances();
+  }
+
+  /* ---------- โหมดดูจุดเดียว ---------- */
+
+  /*
+   * จุดนี้อยู่ตรงไหนของเส้นทางที่กำลังวิ่ง (เมตรจากต้นทาง) — null ถ้าไม่ได้อยู่บนเส้นทาง
+   *
+   * คิดใหม่ทุกครั้งแทนที่จะจำไว้ตอนกด เพราะเส้นทางเปลี่ยนได้ระหว่างที่แผ่นเปิดค้าง
+   * (หลุดเส้นทางแล้วคำนวณใหม่) ถ้าจำค่าเก่าไว้ ระยะจะอ้างอิงเส้นทางที่เลิกใช้ไปแล้ว
+   */
+  function alongOnRoute(focus) {
+    const a = window.Navigate.analysis;
+    if (!a) return null;
+
+    if (focus.kind === 'hotspot') {
+      const hit = window.Hotspots.routeSpotsOrdered().find((x) => x.spot === focus.h);
+      return hit ? hit.along : null;
+    }
+    const p = a.points.find((x) => x.report.id === focus.report.id);
+    return p ? p.along : null;
+  }
+
+  function updateFocusDistance() {
+    const along = alongOnRoute(riskFocus);
+    const box = $('#riskDetail');
+
+    if (along == null) {
+      box.textContent = 'ไม่ได้อยู่บนเส้นทางที่กำลังนำทาง';
+      return;
+    }
+    const ahead = along - (window.Navigate.progress?.travelled ?? 0);
+    box.textContent = ahead < PASSED_M
+      ? 'ผ่านจุดนี้มาแล้ว'
+      : ahead < 30 ? 'กำลังผ่านจุดนี้' : `อีก ${U.formatDistance(ahead)} ข้างหน้า`;
+  }
+
+  /*
+   * การ์ดรายงานฉบับย่อสำหรับตอนขับ — ตัด "นำทางไปจุดนี้" ออกเพราะกำลังนำทางอยู่แล้ว
+   *
+   * แต่เก็บปุ่มยืนยัน/ปฏิเสธไว้ เพราะนี่คือจังหวะที่ผู้ใช้รู้คำตอบจริง ๆ:
+   * เขาเพิ่งขับผ่านจุดนั้นมา จึงบอกได้ว่าของที่มีคนแจ้งไว้ยังอยู่ไหม
+   */
+  function navReportCard(report) {
+    const def = CFG.HAZARD_TYPES[report.type];
+    const sev = CFG.SEVERITY[report.severity];
+
+    return `
+      <div class="detail-card__head" style="--card-color:${def.color}">
+        <div class="detail-card__icon">${def.icon}</div>
+        <div class="detail-card__headText">
+          <strong>${escapeHtml(def.label)}</strong>
+          <h3 class="detail-card__road">${escapeHtml(report.road)}</h3>
+        </div>
+      </div>
+
+      <div class="detail-card__tags">
+        <span class="sev sev--${report.severity}">${escapeHtml(sev.label)}</span>
+        ${sourceTag(report)}
+      </div>
+
+      ${report.note ? `<p class="detail-card__note">${escapeHtml(report.note)}</p>` : ''}
+
+      <dl class="detail-card__stats">
+        <div><dt>รัศมีเตือน</dt><dd>${report.radius} ม.</dd></div>
+        <div><dt>รายงานเมื่อ</dt><dd>${U.formatAgo(report.createdAt)}</dd></div>
+      </dl>
+
+      <div class="detail-card__actions">
+        <button class="ghost-btn" data-act="up">ยังอยู่ · ${report.confirms}</button>
+        <button class="ghost-btn" data-act="down">หายแล้ว · ${report.denies}</button>
+      </div>`;
+  }
+
+  function renderRiskFocus() {
+    const f = riskFocus;
+    const isSpot = f.kind === 'hotspot';
+
+    $('#riskName').textContent = isSpot
+      ? (f.h.road || 'จุดเสี่ยงจากสถิติ')
+      : CFG.HAZARD_TYPES[f.report.type].label;
+
+    $('#riskBody').innerHTML = `
+      ${isSpot ? hotspotCardHtml(f.h) : navReportCard(f.report)}
+      <button type="button" class="ghost-btn risk-back" id="riskBack">
+        ${window.Icons.get('arrowLeft')} ดูจุดเสี่ยงทั้งหมดบนเส้นทาง
+      </button>`;
+
+    $('#riskBack').addEventListener('click', openRiskSheet);
+
+    // โหวตแล้วตัวเลขต้องขยับให้เห็น จึงวาดการ์ดใบเดิมซ้ำหลังกด
+    $$('#riskBody [data-act]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        window.Store.vote(f.report.id, btn.dataset.act === 'up' ? 'up' : 'down');
+        renderRiskFocus();
+      });
+    });
+
+    updateFocusDistance();
+  }
+
+  /*
+   * รวมจุดเสี่ยงสองแหล่งเป็นรายการเดียว เรียงตามลำดับที่จะวิ่งผ่าน
+   *
+   * คนขับอ่านเส้นทางเป็นลำดับเวลา ไม่ใช่เป็นหมวดหมู่ การแยกเป็นสองรายการ
+   * ("รายงาน" กับ "สถิติ") จะบังคับให้เขาไล่สลับสองฝั่งเพื่อรู้ว่าจุดถัดไปคืออะไร
+   * จึงรวมเป็นเส้นเดียวแล้วติดป้ายกำกับที่มาไว้ที่แต่ละแถวแทน
+   */
+  function riskItems(analysis) {
+    const out = [];
+
+    for (const p of analysis.points) {
+      const def = CFG.HAZARD_TYPES[p.report.type];
+      out.push({
+        along: p.along,
+        lng: p.report.lng,
+        lat: p.report.lat,
+        color: def.color,
+        icon: def.icon,
+        title: def.label,
+        sub: `${CFG.SEVERITY[p.report.severity].label} · ${p.road}`,
+        tag: 'รายงาน',
+      });
+    }
+
+    for (const s of window.Hotspots.routeSpotsOrdered()) {
+      const cat = window.Hotspots.classify(s.spot);
+      out.push({
+        along: s.along,
+        lng: s.spot.lon,
+        lat: s.spot.lat,
+        color: cat.color,
+        icon: window.Icons.get(cat.icon),
+        // พาดหัวบอกสิ่งที่ต้องทำก่อน ด้วยเหตุผลเดียวกับการ์ดเตือนระหว่างขับ
+        title: cat.action || cat.label,
+        sub: `เคยเกิด ${s.spot.accidents} ครั้ง · ${s.spot.road || s.spot.province}`,
+        tag: 'สถิติ',
+      });
+    }
+
+    out.sort((x, y) => x.along - y.along);
+    return out;
+  }
+
+  function renderRiskSheet(a) {
+    const blend = tripBlend(a);
+    riskPoints = riskItems(a);
+
+    const rows = riskPoints.map((it, i) => `
+      <li class="risk-item" data-i="${i}" data-along="${Math.round(it.along)}"
+          style="--item-color:${it.color}">
+        <span class="risk-item__icon">${it.icon}</span>
+        <span class="risk-item__text">
+          <strong>${escapeHtml(it.title)}<em class="risk-item__tag">${escapeHtml(it.tag)}</em></strong>
+          <small>${escapeHtml(it.sub)}</small>
+        </span>
+        <span class="risk-item__dist"></span>
+      </li>`).join('');
+
+    const roads = a.roads.slice(0, 5).map((r) => `
+      <li class="trip-road" style="--road-color:${r.level.color}">
+        <span class="trip-road__bar"><i style="height:${Math.max(r.score, 6)}%"></i></span>
+        <span class="trip-road__text">
+          <strong>${escapeHtml(r.road)}</strong>
+          <small>${r.count} จุด${r.accidents ? ` · อุบัติเหตุ ${r.accidents}` : ''}</small>
+        </span>
+        <span class="trip-road__score">${r.score}<small>%</small></span>
+      </li>`).join('');
+
+    $('#riskBody').innerHTML = `
+      <div class="trip-risk" data-level="${blend.levelKey}" style="--risk-color:${blend.color}">
+        <span class="trip-risk__icon">${window.Icons.get('shield')}</span>
+        <span class="trip-risk__text">
+          <strong>เส้นทางนี้ ${escapeHtml(blend.levelLabel)}</strong>
+          <small>${
+            riskPoints.length
+              ? `${riskPoints.length} จุดเสี่ยงบนเส้นทางที่จะวิ่งผ่าน`
+              : 'ไม่พบจุดเสี่ยงบนเส้นทางที่จะวิ่งผ่าน'
+          }</small>
+        </span>
+        <span class="trip-risk__score">${blend.score}<small>%</small></span>
+      </div>
+
+      ${blend.note}
+
+      ${rows ? `
+        <h4 class="trip-subhead">จุดเสี่ยงเรียงตามลำดับที่จะผ่าน</h4>
+        <p class="risk-passed" id="riskPassed" hidden></p>
+        <ul class="risk-list">${rows}</ul>` : ''}
+
+      ${roads ? `
+        <h4 class="trip-subhead">ความเสี่ยงรายถนนบนเส้นทาง</h4>
+        <ul class="trip-roads">${roads}</ul>` : ''}
+
+      <p class="trip-note">${escapeHtml(a.vehicle.note)} · นับจุดที่อยู่ห่างเส้นทางไม่เกิน ${a.corridor} ม.</p>`;
+
+    // แตะแถวไหน แผนที่พาไปดูจุดนั้น แล้วปิดแผ่นเพื่อให้เห็นถนนจริง
+    $$('#riskBody .risk-item').forEach((row) => {
+      row.addEventListener('click', () => {
+        const it = riskPoints[Number(row.dataset.i)];
+        if (!it) return;
+        /*
+         * ปลดล็อกกล้องก่อน ไม่งั้นตำแหน่ง GPS ครั้งถัดไปจะลากกล้องกลับมาที่ลูกศร
+         * ภายในเสี้ยววินาที ผู้ใช้จะเห็นแค่แผนที่กระตุกแล้วเด้งกลับ
+         * ปุ่ม "กลับไปตำแหน่งฉัน" จะโผล่ขึ้นมาเองให้กดกลับได้
+         */
+        window.Store.setFollowing(false);
+        window.MapView.flyToReport(it, { zoom: 16.5 });
+        closeRiskSheet();
+      });
+    });
+  }
+
+  /* ขยับเฉพาะตัวเลขระยะกับสถานะ "ผ่านแล้ว" ตามความคืบหน้าล่าสุด */
+  function updateRiskDistances() {
+    const p = window.Navigate.progress;
+    const a = window.Navigate.analysis;
+    const travelled = p?.travelled ?? 0;
+    let passed = 0;
+
+    // บรรทัดหัวแผ่นต้องเดินตามรถด้วย ไม่ใช่ค้างค่าตอนที่กดเปิดแผ่น
+    $('#riskDetail').textContent =
+      `${a.vehicle.label} · เหลืออีก ${U.formatDistance(p?.remaining ?? a.distance)}`;
+
+    for (const row of $$('#riskBody .risk-item')) {
+      const ahead = Number(row.dataset.along) - travelled;
+      const dist = row.querySelector('.risk-item__dist');
+
+      if (ahead < PASSED_M) {
+        passed++;
+        row.classList.add('is-passed');
+        dist.textContent = 'ผ่านแล้ว';
+        continue;
+      }
+      row.classList.remove('is-passed');
+      // ใกล้กว่านี้คือกำลังผ่านจุดนั้นพอดี บอก "อีก 0 ม." แล้วอ่านแล้วงง
+      row.classList.toggle('is-here', ahead < 30);
+      dist.textContent = ahead < 30 ? 'ตรงนี้' : `อีก ${U.formatDistance(ahead)}`;
+    }
+
+    const note = $('#riskPassed');
+    if (note) {
+      note.hidden = passed === 0;
+      note.textContent = `ผ่านมาแล้ว ${passed} จุด`;
+    }
   }
 
   function formatDuration(seconds) {
@@ -1996,6 +2370,14 @@ window.UI = (function () {
     // ย่อ/ขยายแผ่นความปลอดภัยด้วยปุ่ม (นอกเหนือจากการลาก)
     $('#btnSheetToggle').addEventListener('click', () => setDetent(COLLAPSE_NEXT[detent]));
 
+    // แผ่นจุดเสี่ยงบนเส้นทาง — เปิดจากป้ายความปลอดภัยบนจอนำทาง
+    $('#navSafety').addEventListener('click', openRiskSheet);
+    $('#riskClose').addEventListener('click', closeRiskSheet);
+    $('#riskDone').addEventListener('click', closeRiskSheet);
+    $('#riskSheet').addEventListener('click', (e) => {
+      if (e.target.id === 'riskSheet') closeRiskSheet();
+    });
+
     // แผ่นสรุปการเดินทาง
     $('#tripClose').addEventListener('click', closeTripSheet);
     $('#tripCancel').addEventListener('click', closeTripSheet);
@@ -2147,6 +2529,7 @@ window.UI = (function () {
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
       if (!$('#reportSheet').hidden) closeReportSheet();
+      else if (riskOpen) closeRiskSheet();
       else if (!$('#tripSheet').hidden) closeTripSheet();
       else if (!$('#filterSheet').hidden) closeOverlay('#filterSheet');
       else if (searchOpen) { clearSearch(); closeSearchView(); }
@@ -2176,6 +2559,8 @@ window.UI = (function () {
     showAlert,
     hideAlert,
     showNavHazard,
+    openRiskSheet,
+    openReportDetail,
     showHotspot,
     openTripSheet,
     toast,

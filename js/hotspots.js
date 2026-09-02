@@ -584,6 +584,18 @@ window.Hotspots = (function () {
   }
 
   /*
+   * จุดสถิติบนเส้นทาง เรียงตามลำดับที่จะวิ่งผ่าน พร้อมระยะ along
+   *
+   * ต่างจาก routeHotspots() ที่เรียงตามความรุนแรงเพื่อเอาไปคิดคะแนน — อันนี้
+   * เรียงตามเส้นทาง เพราะคนขับอ่านรายการเป็นลำดับ "จุดถัดไปคืออะไร"
+   * ไม่ใช่ "จุดไหนหนักสุด"
+   */
+  function routeSpotsOrdered() {
+    if (!data) return [];
+    return routeSpots.map((s) => ({ spot: data.hotspots[s.idx], along: s.along, idx: s.idx }));
+  }
+
+  /*
    * จุดสถิติที่กำลังจะถึงบนเส้นทาง — เทียบกับระยะที่วิ่งมาแล้ว
    *
    * ใช้ตรรกะเดียวกับ RouteRisk.upcoming() ทุกอย่าง รวมทั้งการยอมให้เลย
@@ -678,6 +690,7 @@ window.Hotspots = (function () {
     setRouteFilter,
     routeCount,
     routeHotspots,
+    routeSpotsOrdered,
     upcomingOnRoute,
     countAlongRoute,
     trimToFirstSpot,
