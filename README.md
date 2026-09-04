@@ -9,8 +9,10 @@
 **ผลงานสำหรับ CDG Hackathon 2026 — โจทย์ “AI for a Better Society Platform”**
 
 [![CDG Hackathon 2026](https://img.shields.io/badge/CDG%20Hackathon%202026-Top%2021-A855F7?style=for-the-badge&labelColor=1a1a2e)](#)
-[![No API Key](https://img.shields.io/badge/API%20Key-ไม่ต้องใช้-22C55E?style=for-the-badge&labelColor=1a1a2e)](#)
-[![No Build Step](https://img.shields.io/badge/Build%20Step-ไม่มี-F59E0B?style=for-the-badge&labelColor=1a1a2e)](#)
+[![No API Key](https://img.shields.io/badge/API%20Key-None-22C55E?style=for-the-badge&labelColor=1a1a2e)](#)
+[![No Build Step](https://img.shields.io/badge/Build-Zero%20Config-F59E0B?style=for-the-badge&labelColor=1a1a2e)](#)
+[![Static Site](https://img.shields.io/badge/Backend-Not%20Needed-0EA5E9?style=for-the-badge&labelColor=1a1a2e)](#)
+
 
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2020-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
 ![MapLibre](https://img.shields.io/badge/MapLibre%20GL-5.6.0-295DAF?style=flat-square&logo=maplibre&logoColor=white)
