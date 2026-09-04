@@ -20,7 +20,9 @@
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
 ![XGBoost](https://img.shields.io/badge/XGBoost-2.0-EB4C42?style=flat-square)
 ![Node.js](https://img.shields.io/badge/Node.js-20+-339933?style=flat-square&logo=nodedotjs&logoColor=white)
-[![Pitch Deck](https://img.shields.io/badge/Pitch%20Deck-Canva-00C4CC?style=for-the-badge&logo=canva&logoColor=white&labelColor=1a1a2e)](วาง-ลิงก์-Canva-ตรงนี้)
+
+
+[![Pitch Deck](https://img.shields.io/badge/Pitch%20Deck-Canva-00C4CC?style=for-the-badge&logo=canva&logoColor=white&labelColor=1a1a2e)]((https://canva.link/iy2q5awn2gy1usm))
 
 
 `#CDGHackathon2026`
