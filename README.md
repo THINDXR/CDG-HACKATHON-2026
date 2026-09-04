@@ -22,7 +22,7 @@
 ![Node.js](https://img.shields.io/badge/Node.js-20+-339933?style=flat-square&logo=nodedotjs&logoColor=white)
 
 
-[![Pitch Deck](https://img.shields.io/badge/Pitch%20Deck-Canva-00C4CC?style=for-the-badge&logo=canva&logoColor=white&labelColor=1a1a2e)](https://canva.link/iy2q5awn2gy1us](https://canva.link/cdg-v2)
+[![Pitch Deck](https://img.shields.io/badge/Pitch%20Deck-Canva-00C4CC?style=for-the-badge&logo=canva&logoColor=white&labelColor=1a1a2e)](https://canva.link/cdg-v2)
 
 
 `#CDGHackathon2026`
