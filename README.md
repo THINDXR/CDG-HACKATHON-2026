@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/<img width="1076" height="1522" alt="Poster-PR-CDG-Hacakthon-2026" src="https://github.com/user-attachments/assets/d086a172-a5d6-4f06-b875-7e7b582470a9" />" width="300" alt="CDG Hackathon 2026">
+<img width="1076" height="1522" alt="Poster-PR-CDG-Hacakthon-2026" src="https://github.com/user-attachments/assets/d086a172-a5d6-4f06-b875-7e7b582470a9" />
 
 # 🚨 RoadWarn
 
